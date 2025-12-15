@@ -39,9 +39,9 @@ function renderHand() {
             })
         }
 
-        card.innerHTML += `<strong>${spell.name}</strong> <span style="position:absolute; top:5px; left:5px; color:purple; font-weight:bold; font-size: 12px;">${spell.cost}</span>`
+        card.innerHTML += `<strong>${spell.name}</strong> <span style="position:absolute; top:5px; left:5px; color:purple; font-weight:bold; font-size: 12px;">${spell.parameters.cost}</span>`
 
-        if (spell.type === SpellType.ATTACK) {
+        if (spell.type === SpellType.ATTACK && spell.parameters.beta_x !== undefined) {
             const e = spell.parameters
             const ciLevel = (e.beta_x_ci || 0.95) * 100
 
@@ -85,6 +85,7 @@ function deselectCard(index) {
     if (lastIndex > -1) {
         selectedCards.splice(lastIndex, 1)
         renderHand()
+        updateUI()
     }
 }
 
@@ -102,9 +103,18 @@ function updateUI() {
     }
 
     // Render actions as purple circles
-    const actionsContainer = document.getElementById("player-actions")
-    actionsContainer.innerHTML = "" // Clear previous content
-    for (let i = 0; i < actionsRemaining; i++) {
+    const playerActionsContainer = document.getElementById("player-actions")
+    const enemyActionsContainer = document.getElementById("enemy-actions")
+
+    playerActionsContainer.innerHTML = ""
+    enemyActionsContainer.innerHTML = ""
+
+    const currentCost = selectedCards.reduce((sum, idx) => sum + deck[idx].parameters.cost, 0)
+    const displayActions = actionsRemaining - currentCost
+
+    const targetContainer = currentTurn === "player" ? playerActionsContainer : enemyActionsContainer
+
+    for (let i = 0; i < displayActions; i++) {
         const circle = document.createElement("span")
         circle.style.display = "inline-block"
         circle.style.width = "15px"
@@ -112,7 +122,7 @@ function updateUI() {
         circle.style.backgroundColor = "purple"
         circle.style.borderRadius = "50%"
         circle.style.marginRight = "5px"
-        actionsContainer.appendChild(circle)
+        targetContainer.appendChild(circle)
     }
 
     // Render Enemy HP as circles
@@ -138,7 +148,7 @@ function updateUI() {
     }
 }
 
-function renderDeckBuilder(compendium, selectedIndices, onToggle, onComplete, playerName) {
+function renderDeckBuilder(compendium, selectedIndices, onToggle, onComplete, playerName, character) {
     // Create or get overlay
     let overlay = document.getElementById("deck-builder-overlay")
     if (!overlay) {
@@ -162,25 +172,56 @@ function renderDeckBuilder(compendium, selectedIndices, onToggle, onComplete, pl
     overlay.innerHTML = ""
 
     const title = document.createElement("h2")
-    title.innerText = `${playerName}: Select up to 4 Spells (${selectedIndices.length}/4)`
+    const offensiveCount = selectedIndices.filter((i) => compendium[i].type === SpellType.ATTACK).length
+    const defensiveCount = selectedIndices.filter((i) => compendium[i].type !== SpellType.ATTACK).length
+    title.innerText = `${playerName} (${character ? character.name : "God"}): Select Spells`
     overlay.appendChild(title)
 
-    const grid = document.createElement("div")
-    grid.style.display = "grid"
-    grid.style.gridTemplateColumns = "repeat(4, 1fr)"
-    grid.style.gap = "10px"
-    grid.style.maxHeight = "70vh"
-    grid.style.overflowY = "auto"
-    grid.style.padding = "20px"
-    overlay.appendChild(grid)
+    const container = document.createElement("div")
+    container.style.display = "flex"
+    container.style.width = "90%"
+    container.style.height = "70vh"
+    container.style.gap = "20px"
+    overlay.appendChild(container)
+
+    // Offensive Column
+    const offensiveCol = document.createElement("div")
+    offensiveCol.style.flex = "1"
+    offensiveCol.style.border = "1px solid #444"
+    offensiveCol.style.padding = "10px"
+    offensiveCol.style.overflowY = "auto"
+    const maxOffensive = character ? character.n_spells_offensive : 3
+    offensiveCol.innerHTML = `<h3>Offensive Spells (${offensiveCount}/${maxOffensive})</h3>`
+    const offensiveGrid = document.createElement("div")
+    offensiveGrid.style.display = "flex"
+    offensiveGrid.style.flexWrap = "wrap"
+    offensiveGrid.style.gap = "10px"
+    offensiveGrid.style.justifyContent = "center"
+    offensiveCol.appendChild(offensiveGrid)
+    container.appendChild(offensiveCol)
+
+    // Defensive Column
+    const defensiveCol = document.createElement("div")
+    defensiveCol.style.flex = "1"
+    defensiveCol.style.border = "1px solid #444"
+    defensiveCol.style.padding = "10px"
+    defensiveCol.style.overflowY = "auto"
+    const maxDefensive = character ? character.n_spells_defensive : 3
+    defensiveCol.innerHTML = `<h3>Defensive Spells (${defensiveCount}/${maxDefensive})</h3>`
+    const defensiveGrid = document.createElement("div")
+    defensiveGrid.style.display = "flex"
+    defensiveGrid.style.flexWrap = "wrap"
+    defensiveGrid.style.gap = "10px"
+    defensiveGrid.style.justifyContent = "center"
+    defensiveCol.appendChild(defensiveGrid)
+    container.appendChild(defensiveCol)
 
     compendium.forEach((spell, index) => {
-        if (spell.available === 0) return
+        // Filter by character
+        if (character && !character.spells.includes(spell.id)) return
 
         // Determine how many times this spell is selected
         const count = selectedIndices.filter((i) => i === index).length
-        // Unlimited selection allowed if available > 0
-        // const max = spell.available
 
         const card = document.createElement("div")
         card.className = "card"
@@ -188,6 +229,7 @@ function renderDeckBuilder(compendium, selectedIndices, onToggle, onComplete, pl
         card.style.color = "black"
         card.style.position = "relative"
         card.style.cursor = "pointer"
+        // card.style.width = "100%" // Removed to allow natural size from CSS
 
         if (count > 0) {
             card.style.border = "3px solid gold"
@@ -195,7 +237,7 @@ function renderDeckBuilder(compendium, selectedIndices, onToggle, onComplete, pl
 
         card.innerHTML = `<strong>${spell.name}</strong>`
 
-        if (spell.type === SpellType.ATTACK) {
+        if (spell.type === SpellType.ATTACK && spell.parameters.beta_x !== undefined) {
             const e = spell.parameters
             const ciLevel = (e.beta_x_ci || 0.95) * 100
 
@@ -222,24 +264,34 @@ function renderDeckBuilder(compendium, selectedIndices, onToggle, onComplete, pl
         }
 
         // Counter badge
-        const badge = document.createElement("div")
-        badge.style.position = "absolute"
-        badge.style.top = "5px"
-        badge.style.right = "5px"
-        badge.style.backgroundColor = "black"
-        badge.style.color = "white"
-        badge.style.borderRadius = "50%"
-        badge.style.width = "20px"
-        badge.style.height = "20px"
-        badge.style.display = "flex"
-        badge.style.alignItems = "center"
-        badge.style.justifyContent = "center"
-        badge.style.fontSize = "12px"
-        badge.innerText = `${count}`
-        card.appendChild(badge)
+        if (count > 0) {
+            const badge = document.createElement("div")
+            badge.style.position = "absolute"
+            badge.style.top = "5px"
+            badge.style.right = "5px"
+            badge.style.backgroundColor = "black"
+            badge.style.color = "white"
+            badge.style.borderRadius = "50%"
+            badge.style.width = "20px"
+            badge.style.height = "20px"
+            badge.style.display = "flex"
+            badge.style.alignItems = "center"
+            badge.style.justifyContent = "center"
+            badge.style.fontSize = "12px"
+            badge.innerText = `${count}`
+            card.appendChild(badge)
+        }
 
-        card.onclick = () => onToggle(index)
-        grid.appendChild(card)
+        card.onclick = () => onToggle(index, "add")
+        card.oncontextmenu = (e) => {
+            e.preventDefault()
+            onToggle(index, "remove")
+        }
+        if (spell.type === SpellType.ATTACK) {
+            offensiveGrid.appendChild(card)
+        } else {
+            defensiveGrid.appendChild(card)
+        }
     })
 
     const confirmBtn = document.createElement("button")
@@ -253,4 +305,80 @@ function renderDeckBuilder(compendium, selectedIndices, onToggle, onComplete, pl
         onComplete()
     }
     overlay.appendChild(confirmBtn)
+}
+
+function renderCharacterSelection(onSelect, playerNum) {
+    let overlay = document.getElementById("deck-builder-overlay")
+    if (!overlay) {
+        overlay = document.createElement("div")
+        overlay.id = "deck-builder-overlay"
+        overlay.style.position = "fixed"
+        overlay.style.top = "0"
+        overlay.style.left = "0"
+        overlay.style.width = "100%"
+        overlay.style.height = "100%"
+        overlay.style.backgroundColor = "rgba(0,0,0,0.9)"
+        overlay.style.zIndex = "1000"
+        overlay.style.display = "flex"
+        overlay.style.flexDirection = "column"
+        overlay.style.alignItems = "center"
+        overlay.style.justifyContent = "center"
+        overlay.style.color = "white"
+        document.body.appendChild(overlay)
+    }
+
+    overlay.innerHTML = ""
+    const title = document.createElement("h2")
+    title.innerText = `Player ${playerNum}: Select Character`
+    overlay.appendChild(title)
+
+    const container = document.createElement("div")
+    container.style.display = "flex"
+    container.style.gap = "20px"
+    overlay.appendChild(container)
+
+    Object.keys(Characters).forEach((key) => {
+        const char = Characters[key]
+        const card = document.createElement("div")
+        card.className = "card"
+        card.style.width = "200px"
+        card.style.height = "300px"
+        card.style.cursor = "pointer"
+
+        card.innerHTML = `
+            <h3>${char.name}</h3>
+            <img src="${char.sprite}" style="width:100px; height:100px; object-fit:contain;">
+            <p>Spells: ${char.spells.length}</p>
+        `
+        card.onclick = () => {
+            overlay.remove()
+            onSelect(char)
+        }
+        container.appendChild(card)
+    })
+}
+
+function showToast(message) {
+    let toast = document.getElementById("toast-message")
+    if (!toast) {
+        toast = document.createElement("div")
+        toast.id = "toast-message"
+        toast.style.position = "fixed"
+        toast.style.top = "20%"
+        toast.style.left = "50%"
+        toast.style.transform = "translate(-50%, -50%)"
+        toast.style.backgroundColor = "rgba(255, 0, 0, 0.8)"
+        toast.style.color = "white"
+        toast.style.padding = "15px 30px"
+        toast.style.borderRadius = "5px"
+        toast.style.fontSize = "20px"
+        toast.style.zIndex = "2000"
+        toast.style.pointerEvents = "none"
+        document.body.appendChild(toast)
+    }
+    toast.innerText = message
+    toast.style.display = "block"
+    setTimeout(() => {
+        toast.style.display = "none"
+    }, 1500)
 }

@@ -158,6 +158,16 @@ body {
     box-shadow: 0 0 20px orange;
 }
 
+#game-canvas.hit {
+    border-color: #66bb6a;
+    box-shadow: 0 0 20px #66bb6a;
+}
+
+#game-canvas.miss {
+    border-color: #ef5350;
+    box-shadow: 0 0 20px #ef5350;
+}
+
 #turn-indicator {
     font-size: 24px;
     font-weight: bold;
@@ -204,6 +214,7 @@ body {
     text-align: center;
     font-size: 11px; /* Decreased from 12px */
     transition: transform 0.2s;
+    position: relative;
 }
 
 .card:hover {

@@ -48,7 +48,13 @@ Educational game that develops the intuition of statistics (linear models).
 - [x] Spellbook with Attack, Modifier, and Movement spells
 - [x] Visual effects (Particles, Projectiles, Rays, Pre-cast animations)
 - [ ] **Confidence Intervals**: Implement visual noise in spell trajectories based on CI parameters.
-- [ ] **Progression**: Level-up system, unlocking new spells and items. New opponents with different skills. Different player selection (character creation with various archetypes, e.g., spell caster vs. hunter with bow). Evolutive skins and cosmetics when advancing levels (from basic monk robe to advanced wizard robes with crowns etc.).
+- [ ] **Progression**: 
+  - Level-up system, unlocking new spells and items.
+  - Skill tree (more action points, HP, ...) 
+  - New opponents with different skills. 
+  - Different player selection (character creation with various archetypes, e.g., spell caster vs. hunter with bow). 
+  - Evolutive skins and cosmetics when advancing levels (from basic monk robe to advanced wizard robes with crowns etc.).
 - [ ] **Advanced AI**: Smarter enemy behavior beyond random selection.
 - [ ] **Sound**: Add sound effects for casting, hits, and movement.
 - [ ] **Online Multiplayer**: Play against remote opponents.
+  - Tournament mode for classrooms or groups.

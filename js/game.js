@@ -7,6 +7,8 @@ let actionsRemaining = 2
 let selectedCards = []
 let gameLog = []
 let gameMode = "pve" // 'pve' or 'pvp'
+let p1Character = null
+let p2Character = null
 
 // Temporary storage for deck building
 let p1DeckIndices = []
@@ -16,8 +18,26 @@ function startGame(mode) {
     document.getElementById("main-menu").style.display = "none"
     gameMode = mode || "pve"
 
-    // Start Deck Building Phase for Player 1
-    startDeckBuilding(1)
+    if (gameMode === "pvp") {
+        startCharacterSelection(1)
+    } else {
+        // PvE Defaults
+        p1Character = Characters.Player
+        p2Character = Characters.Quicksilver
+        startDeckBuilding(1)
+    }
+}
+
+function startCharacterSelection(playerNum) {
+    renderCharacterSelection((char) => {
+        if (playerNum === 1) {
+            p1Character = char
+            startCharacterSelection(2)
+        } else {
+            p2Character = char
+            startDeckBuilding(1)
+        }
+    }, playerNum)
 }
 
 function startDeckBuilding(playerNum) {
@@ -27,26 +47,49 @@ function startDeckBuilding(playerNum) {
 
 function updateDeckBuilderUI(selectedIndices, playerNum) {
     const playerName = playerNum === 1 ? "Player 1" : "Player 2"
+    const character = playerNum === 1 ? p1Character : p2Character
 
     renderDeckBuilder(
         Compendium,
         selectedIndices,
-        (index) => {
+        (index, action) => {
             // Toggle Logic
-            // Unlimited selection allowed if available > 0
             const spell = Compendium[index]
+            const isOffensive = spell.type === SpellType.ATTACK
 
-            if (selectedIndices.length < 4) {
-                selectedIndices.push(index)
-            } else {
+            // Count current selections
+            const offensiveCount = selectedIndices.filter((i) => Compendium[i].type === SpellType.ATTACK).length
+            const defensiveCount = selectedIndices.filter((i) => Compendium[i].type !== SpellType.ATTACK).length
+
+            if (action === "remove") {
                 const idx = selectedIndices.indexOf(index)
-                if (idx > -1) selectedIndices.splice(idx, 1)
+                if (idx > -1) {
+                    selectedIndices.splice(idx, 1)
+                }
+            } else {
+                // Add
+                if (isOffensive) {
+                    if (offensiveCount < character.n_spells_offensive) selectedIndices.push(index)
+                } else {
+                    if (defensiveCount < character.n_spells_defensive) selectedIndices.push(index)
+                }
             }
 
             updateDeckBuilderUI(selectedIndices, playerNum)
         },
         () => {
             // On Complete
+            // Validate deck size
+            const offensiveCount = selectedIndices.filter((i) => Compendium[i].type === SpellType.ATTACK).length
+            const defensiveCount = selectedIndices.filter((i) => Compendium[i].type !== SpellType.ATTACK).length
+
+            if (offensiveCount !== character.n_spells_offensive || defensiveCount !== character.n_spells_defensive) {
+                alert(
+                    `You must select exactly ${character.n_spells_offensive} offensive and ${character.n_spells_defensive} defensive spells.`
+                )
+                return
+            }
+
             if (playerNum === 1) {
                 p1DeckIndices = [...selectedIndices]
 
@@ -64,39 +107,52 @@ function updateDeckBuilderUI(selectedIndices, playerNum) {
                 init()
             }
         },
-        playerName
+        playerName,
+        character
     )
 }
 
 function generateAiDeck() {
     p2DeckIndices = []
-    // "AI picks randomly one of each"
-    // Interpretation: Pick 4 random cards from available ones.
-    // Filter available > 0
+    // AI picks from its character spells
+    const character = p2Character || Characters.Quicksilver // Fallback
     const availableIndices = Compendium.map((s, i) => ({ s, i }))
-        .filter((x) => x.s.available > 0)
+        .filter((item) => character.spells.includes(item.s.id))
         .map((x) => x.i)
 
-    for (let i = 0; i < 4; i++) {
-        const rand = availableIndices[Math.floor(Math.random() * availableIndices.length)]
-        p2DeckIndices.push(rand)
-    }
+    const offensiveIndices = availableIndices.filter((i) => Compendium[i].type === SpellType.ATTACK)
+    const defensiveIndices = availableIndices.filter((i) => Compendium[i].type !== SpellType.ATTACK)
+
+    // Pick n_spells_offensive
+    const shuffledOffensive = [...offensiveIndices].sort(() => 0.5 - Math.random())
+    p2DeckIndices.push(...shuffledOffensive.slice(0, character.n_spells_offensive))
+
+    // Pick n_spells_defensive
+    const shuffledDefensive = [...defensiveIndices].sort(() => 0.5 - Math.random())
+    p2DeckIndices.push(...shuffledDefensive.slice(0, character.n_spells_defensive))
 }
 
 function init() {
-    // Get Move Spells (always included)
-    const moveSpells = Compendium.filter((s) => s.type === SpellType.MOVE)
-
     // Initialize entities
     // Player on left
-    player = new Wizard("Player", 4, 0, 0, "blue")
-    const p1Spells = p1DeckIndices.map((i) => Compendium[i]).concat(moveSpells)
+    player = new Wizard("Player", 4, 0, 0, "blue", p1Character ? p1Character.sprite : "img/character_player.png")
+    const p1Spells = p1DeckIndices.map((i) => Compendium[i])
     player.setSpellBook(p1Spells)
 
     // Enemy on right
-    enemy = new Wizard(gameMode === "pvp" ? "Player 2" : "Enemy", 4, 1, 0, "red")
-    const p2Spells = p2DeckIndices.map((i) => Compendium[i]).concat(moveSpells)
+    enemy = new Wizard(
+        gameMode === "pvp" ? "Player 2" : "Enemy",
+        4,
+        1,
+        0,
+        "red",
+        p2Character ? p2Character.sprite : "img/character_quicksilver.png"
+    )
+    const p2Spells = p2DeckIndices.map((i) => Compendium[i])
     enemy.setSpellBook(p2Spells)
+
+    // Set Sprites in Renderer
+    setEntitySprites(player.sprite, enemy.sprite)
 
     // Initial Draw
     currentTurn = "player" // Start with player
@@ -123,9 +179,25 @@ function drawCards() {
     deck = []
     const currentWizard = currentTurn === "player" ? player : enemy
     const spellBook = currentWizard.spellBook
+    const character = currentTurn === "player" ? p1Character : p2Character
+    const handSize = character ? character.n_spells_hand : 3
 
-    // Sample 3 random cards from SpellBook
-    for (let i = 0; i < 3; i++) {
+    // Ensure at least 1 offensive and 1 defensive spell if possible
+    const offensiveSpells = spellBook.filter((s) => s.type === SpellType.ATTACK)
+    const defensiveSpells = spellBook.filter((s) => s.type !== SpellType.ATTACK)
+
+    if (offensiveSpells.length > 0) {
+        const rand = Math.floor(Math.random() * offensiveSpells.length)
+        deck.push(offensiveSpells[rand])
+    }
+
+    if (defensiveSpells.length > 0) {
+        const rand = Math.floor(Math.random() * defensiveSpells.length)
+        deck.push(defensiveSpells[rand])
+    }
+
+    // Fill remaining slots (up to handSize)
+    while (deck.length < handSize) {
         if (spellBook.length === 0) break
         const randomIndex = Math.floor(Math.random() * spellBook.length)
         deck.push(spellBook[randomIndex])
@@ -136,18 +208,25 @@ function drawCards() {
 function selectCard(index) {
     if (gameMode === "pve" && currentTurn === "enemy") return
 
+    // Single selection per turn check
+    // (keep the logic for multiple selection in but make a note that it might be useful when we implement a skill tree with skills allowing for re-use of spells)
+    if (selectedCards.includes(index)) return
+
     // Select if we have enough action points
-    const currentCost = selectedCards.reduce((sum, idx) => sum + deck[idx].cost, 0)
-    const cardCost = deck[index].cost
+    const currentCost = selectedCards.reduce((sum, idx) => sum + deck[idx].parameters.cost, 0)
+    const cardCost = deck[index].parameters.cost
 
     if (currentCost + cardCost <= actionsRemaining) {
         selectedCards.push(index)
+    } else {
+        showToast("Not enough AP")
     }
 
     renderHand()
+    updateUI()
 
     // Check if we have used all action points
-    const totalCost = selectedCards.reduce((sum, idx) => sum + deck[idx].cost, 0)
+    const totalCost = selectedCards.reduce((sum, idx) => sum + deck[idx].parameters.cost, 0)
     if (totalCost === actionsRemaining) {
         // Small delay to show the selection before executing
         setTimeout(executeSequence, 500)
@@ -201,26 +280,43 @@ function switchTurn() {
 }
 
 function performAiTurn() {
-    // Simple AI: Select 2 random cards
-    const indices = [0, 1, 2]
+    // Simple AI: Select random cards that fit in AP
+    const indices = deck.map((_, i) => i) // Available indices
     // Shuffle
     for (let i = indices.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1))
         ;[indices[i], indices[j]] = [indices[j], indices[i]]
     }
 
-    const pick1 = indices[0]
-    const pick2 = indices[1]
+    let currentCost = 0
+    const aiSelected = []
+
+    for (const idx of indices) {
+        const card = deck[idx]
+        if (currentCost + card.parameters.cost <= actionsRemaining) {
+            aiSelected.push(idx)
+            currentCost += card.parameters.cost
+        }
+    }
 
     // Simulate selection
-    selectedCards.push(pick1)
-    renderHand()
-
-    setTimeout(() => {
-        selectedCards.push(pick2)
+    if (aiSelected.length > 0) {
+        selectedCards.push(aiSelected[0])
         renderHand()
-        setTimeout(executeSequence, 500)
-    }, 1000)
+
+        if (aiSelected.length > 1) {
+            setTimeout(() => {
+                selectedCards.push(aiSelected[1])
+                renderHand()
+                setTimeout(executeSequence, 500)
+            }, 1000)
+        } else {
+            setTimeout(executeSequence, 1000)
+        }
+    } else {
+        // No cards selected (shouldn't happen if costs are low, but possible)
+        setTimeout(switchTurn, 1000)
+    }
 }
 
 function castSpell(caster, target, spell) {
@@ -229,18 +325,45 @@ function castSpell(caster, target, spell) {
     if (spell.type === SpellType.MODIFIER) {
         if (spell.parameters.beta_x_modify) caster.modifiers.beta_x += spell.parameters.beta_x_modify
         if (spell.parameters.beta_zero_modify) caster.modifiers.beta_zero += spell.parameters.beta_zero_modify
+        if (spell.parameters.animation_prespell) caster.modifiers.animation_prespell = spell.parameters.animation_prespell
     } else if (spell.type === SpellType.MOVE) {
+        let moved = false
         if (spell.parameters.move_self_y) {
+            const oldY = caster.targetY
             caster.targetY += spell.parameters.move_self_y
             // Clamp to grid (-1 to 1)
             caster.targetY = Math.max(-1, Math.min(1, caster.targetY))
+            if (caster.targetY !== oldY) moved = true
         }
         if (spell.parameters.move_target_y) {
+            const oldY = target.targetY
             target.targetY += spell.parameters.move_target_y
             // Clamp to grid (-1 to 1)
             target.targetY = Math.max(-1, Math.min(1, target.targetY))
+            if (target.targetY !== oldY) moved = true
         }
+        if (!moved) flashCanvas("miss")
     } else if (spell.type === SpellType.ATTACK) {
+        // Handle Move-based Attacks (e.g. Strong Wind)
+        if (spell.parameters.move_self_y || spell.parameters.move_target_y) {
+            let moved = false
+            if (spell.parameters.move_self_y) {
+                const oldY = caster.targetY
+                caster.targetY += spell.parameters.move_self_y
+                caster.targetY = Math.max(-1, Math.min(1, caster.targetY))
+                if (caster.targetY !== oldY) moved = true
+            }
+            if (spell.parameters.move_target_y) {
+                const oldY = target.targetY
+                target.targetY += spell.parameters.move_target_y
+                target.targetY = Math.max(-1, Math.min(1, target.targetY))
+                if (target.targetY !== oldY) moved = true
+            }
+            if (!moved) flashCanvas("miss")
+            // If it doesn't have attack parameters, stop here
+            if (spell.parameters.beta_x === undefined) return
+        }
+
         // Calculate trajectory with CI noise
         let baseSlope = spell.parameters.beta_x
         if (spell.parameters.beta_x_min !== undefined && spell.parameters.beta_x_max !== undefined) {
@@ -289,9 +412,11 @@ function castSpell(caster, target, spell) {
 
         if (Math.abs(hitY - targetY) <= tolerance) {
             console.log("Hit!")
+            flashCanvas("hit")
             // Delay damage until animation hits
             setTimeout(() => {
-                target.takeDamage(1)
+                const damage = spell.parameters.damage || 1
+                target.takeDamage(damage)
                 updateUI() // Update UI to reflect damage
                 checkGameOver()
 
@@ -305,8 +430,17 @@ function castSpell(caster, target, spell) {
             }, spell.parameters.duration)
         } else {
             console.log(`Miss! Shot at y=${hitY}, target at y=${targetY}`)
+            flashCanvas("miss")
         }
     }
+}
+
+function flashCanvas(type) {
+    const canvas = document.getElementById("game-canvas")
+    canvas.classList.add(type)
+    setTimeout(() => {
+        canvas.classList.remove(type)
+    }, 500)
 }
 
 function checkGameOver() {
@@ -368,9 +502,13 @@ function gameLoop() {
 }
 
 document.getElementById("end-turn-btn").onclick = () => {
-    if (currentTurn === "player") {
-        switchTurn()
-    } else if (gameMode === "pvp" && currentTurn === "enemy") {
-        switchTurn()
+    if (selectedCards.length > 0) {
+        executeSequence()
+    } else {
+        if (currentTurn === "player") {
+            switchTurn()
+        } else if (gameMode === "pvp" && currentTurn === "enemy") {
+            switchTurn()
+        }
     }
 }

@@ -1,10 +1,25 @@
 // Load Images
 const playerImg = new Image()
-playerImg.src = "img/wizard1_blue.png"
+// playerImg.src = "img/wizard1_blue.png" // Set dynamically
 const enemyImg = new Image()
-enemyImg.src = "img/wizard1_red.png"
+// enemyImg.src = "img/wizard1_red.png" // Set dynamically
 const cloudImg = new Image()
 cloudImg.src = "img/darkcloud.png"
+
+const imageCache = {}
+function getImage(src) {
+    if (!imageCache[src]) {
+        const img = new Image()
+        img.src = src
+        imageCache[src] = img
+    }
+    return imageCache[src]
+}
+
+function setEntitySprites(p1Src, p2Src) {
+    playerImg.src = p1Src
+    enemyImg.src = p2Src
+}
 
 let lastShot = null
 let particles = []
@@ -277,11 +292,17 @@ function draw() {
         const screenEndY = ORIGIN_Y - endY * PIXELS_PER_Y_UNIT
 
         if (lastShot.parameters && lastShot.parameters.visual_type === "projectile") {
-            // Draw Projectile (Circle)
-            ctx.fillStyle = lastShot.parameters.visual_color || "orange"
-            ctx.beginPath()
-            ctx.arc(screenEndX, screenEndY, 10, 0, Math.PI * 2)
-            ctx.fill()
+            if (lastShot.parameters.animation_projectile) {
+                const img = getImage(lastShot.parameters.animation_projectile)
+                // Draw centered, 64x64 size for projectile
+                ctx.drawImage(img, screenEndX - 32, screenEndY - 32, 64, 64)
+            } else {
+                // Draw Projectile (Circle)
+                ctx.fillStyle = lastShot.parameters.visual_color || "orange"
+                ctx.beginPath()
+                ctx.arc(screenEndX, screenEndY, 10, 0, Math.PI * 2)
+                ctx.fill()
+            }
         } else {
             // Draw Ray (Line)
             ctx.strokeStyle = (lastShot.parameters && lastShot.parameters.visual_color) || "lightblue"
@@ -293,12 +314,16 @@ function draw() {
             ctx.stroke()
         }
 
-        // Pre-spell Animation (Cloud) - Drawn AFTER ray to be "above"
-        if (lastShot.parameters && lastShot.parameters.animation_prespell) {
-            // Draw cloud at origin of spell
+        // Pre-spell Animation (Cloud or Portal) - Drawn AFTER ray to be "above"
+        const prespellImgSrc =
+            (lastShot.modifiers && lastShot.modifiers.animation_prespell) || (lastShot.parameters && lastShot.parameters.animation_prespell)
+
+        if (prespellImgSrc) {
+            const img = getImage(prespellImgSrc)
+            // Draw at origin of spell
             // Origin is screenStartX, screenStartY
-            // 2x bigger = 120x120
-            ctx.drawImage(cloudImg, screenStartX - 60, screenStartY - 60, 120, 120)
+            // 120x120
+            ctx.drawImage(img, screenStartX - 60, screenStartY - 60, 120, 120)
         }
     }
 

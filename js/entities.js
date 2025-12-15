@@ -1,6 +1,6 @@
 // --- Entities ---
 class Wizard {
-    constructor(name, hp, x, y, color) {
+    constructor(name, hp, x, y, color, sprite) {
         this.name = name
         this.maxHp = hp
         this.hp = hp
@@ -8,6 +8,7 @@ class Wizard {
         this.y = y
         this.targetY = y
         this.color = color
+        this.sprite = sprite
         this.width = 60 // Sprite width in pixels
         this.height = 60 // Sprite height in pixels
         this.modifiers = {
@@ -33,5 +34,6 @@ class Wizard {
     resetModifiers() {
         this.modifiers.beta_x = 0
         this.modifiers.beta_zero = 0
+        this.modifiers.animation_prespell = null
     }
 }
