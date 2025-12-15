@@ -54,6 +54,7 @@ Educational game that develops the intuition of statistics (linear models).
   - New opponents with different skills. 
   - Different player selection (character creation with various archetypes, e.g., spell caster vs. hunter with bow). 
   - Evolutive skins and cosmetics when advancing levels (from basic monk robe to advanced wizard robes with crowns etc.).
+  - As the player progresses and gains more HPs, spells with more damage appear, with more complex trajectories to master (polynomials and interactions).
 - [ ] **Advanced AI**: Smarter enemy behavior beyond random selection.
 - [ ] **Sound**: Add sound effects for casting, hits, and movement.
 - [ ] **Online Multiplayer**: Play against remote opponents.

@@ -65,8 +65,8 @@ body {
 #main-menu h1 {
     font-size: 48px;
     margin-bottom: 40px;
-    color: #0f0;
-    text-shadow: 0 0 10px #0f0;
+    color: rgb(139, 0, 121);
+    text-shadow: 0 0 10px rgb(139, 0, 121);
 }
 
 #main-menu button {
@@ -75,16 +75,16 @@ body {
     font-size: 24px;
     background-color: #333;
     color: white;
-    border: 2px solid #0f0;
+    border: 2px solid rgb(139, 0, 121);
     cursor: pointer;
     font-family: 'Courier New', Courier, monospace;
     transition: all 0.3s;
 }
 
 #main-menu button:hover {
-    background-color: #0f0;
+    background-color: rgb(139, 0, 121);
     color: black;
-    box-shadow: 0 0 20px #0f0;
+    box-shadow: 0 0 20px rgb(139, 0, 121);
 }
 
 #game-over-screen {

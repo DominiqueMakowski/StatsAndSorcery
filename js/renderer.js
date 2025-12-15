@@ -22,10 +22,15 @@ function setEntitySprites(p1Src, p2Src) {
 }
 
 let lastShot = null
+let lastEffect = null
 let particles = []
 
 function visualizeShot(slope, intercept, caster, duration, parameters, modifiers) {
     lastShot = { slope, intercept, caster, time: Date.now(), duration, parameters, modifiers }
+}
+
+function visualizeEffect(x, y, imageSrc, duration) {
+    lastEffect = { x, y, imageSrc, time: Date.now(), duration }
 }
 
 function createImpactParticles(x, y, color) {
@@ -179,6 +184,12 @@ function draw() {
     ctx.save()
     ctx.translate(playerScreenX, playerScreenY)
     ctx.scale(-1, 1) // Mirror horizontally
+
+    if (player.isBouncing) {
+        ctx.shadowColor = "red"
+        ctx.shadowBlur = 20
+    }
+
     // Draw centered
     ctx.drawImage(playerImg, -player.width / 2, -player.height / 2, player.width, player.height)
     ctx.restore()
@@ -187,7 +198,13 @@ function draw() {
     const enemyScreenX = ORIGIN_X + 1 * AXIS_LENGTH
     const enemyScreenY = ORIGIN_Y - enemy.y * PIXELS_PER_Y_UNIT
 
+    ctx.save()
+    if (enemy.isBouncing) {
+        ctx.shadowColor = "red"
+        ctx.shadowBlur = 20
+    }
     ctx.drawImage(enemyImg, enemyScreenX - enemy.width / 2, enemyScreenY - enemy.height / 2, enemy.width, enemy.height)
+    ctx.restore()
 
     // Draw Last Shot
     if (lastShot && Date.now() - lastShot.time < lastShot.duration + 500) {
@@ -325,6 +342,16 @@ function draw() {
             // 120x120
             ctx.drawImage(img, screenStartX - 60, screenStartY - 60, 120, 120)
         }
+    }
+
+    // Draw Last Effect (e.g. Wind)
+    if (lastEffect && Date.now() - lastEffect.time < lastEffect.duration) {
+        const img = getImage(lastEffect.imageSrc)
+        const screenX = ORIGIN_X + lastEffect.x * AXIS_LENGTH
+        const screenY = ORIGIN_Y - lastEffect.y * PIXELS_PER_Y_UNIT
+
+        // Draw centered, slightly larger than character
+        ctx.drawImage(img, screenX - 50, screenY - 50, 100, 100)
     }
 
     updateParticles()

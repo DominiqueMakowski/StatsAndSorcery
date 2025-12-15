@@ -346,6 +346,14 @@ function castSpell(caster, target, spell) {
     } else if (spell.type === SpellType.ATTACK) {
         // Handle Move-based Attacks (e.g. Strong Wind)
         if (spell.parameters.move_self_y || spell.parameters.move_target_y) {
+            // Visual Effect for Move Attacks (Wind)
+            if (spell.parameters.animation_prespell && spell.parameters.move_target_y) {
+                // Target's current position
+                const tx = target.name === "Player" ? 0 : 1
+                const ty = target.y
+                visualizeEffect(tx, ty, spell.parameters.animation_prespell, 500)
+            }
+
             let moved = false
             if (spell.parameters.move_self_y) {
                 const oldY = caster.targetY
@@ -354,10 +362,38 @@ function castSpell(caster, target, spell) {
                 if (caster.targetY !== oldY) moved = true
             }
             if (spell.parameters.move_target_y) {
-                const oldY = target.targetY
-                target.targetY += spell.parameters.move_target_y
-                target.targetY = Math.max(-1, Math.min(1, target.targetY))
-                if (target.targetY !== oldY) moved = true
+                const move = spell.parameters.move_target_y
+                const currentY = target.targetY
+                const newY = currentY + move
+
+                if (newY > 1 || newY < -1) {
+                    // Out of bounds - Bounce & Damage
+                    console.log("Pushed into wall!")
+                    triggerBounceAnimation(target, Math.sign(move))
+
+                    // Apply Damage
+                    const damage = spell.parameters.damage || 0
+                    if (damage > 0) {
+                        setTimeout(() => {
+                            target.takeDamage(damage)
+                            updateUI()
+                            checkGameOver()
+                            flashCanvas("hit")
+                            // Visual particles at the wall
+                            const wallY = newY > 1 ? 1 : -1
+                            const targetX = target.name === "Player" ? 0 : 1
+                            const screenX = ORIGIN_X + targetX * AXIS_LENGTH
+                            const screenY = ORIGIN_Y - wallY * PIXELS_PER_Y_UNIT
+                            createImpactParticles(screenX, screenY, "red")
+                        }, 300) // Sync with bounce impact
+                    }
+                    moved = true
+                } else {
+                    const oldY = target.targetY
+                    target.targetY = newY
+                    // target.targetY = Math.max(-1, Math.min(1, target.targetY)) // Already checked bounds
+                    if (target.targetY !== oldY) moved = true
+                }
             }
             if (!moved) flashCanvas("miss")
             // If it doesn't have attack parameters, stop here
@@ -511,4 +547,21 @@ document.getElementById("end-turn-btn").onclick = () => {
             switchTurn()
         }
     }
+}
+
+function triggerBounceAnimation(char, direction) {
+    const limit = direction > 0 ? 1 : -1
+    const overshoot = limit + direction * 0.3
+
+    // Move to overshoot
+    char.targetY = overshoot
+    char.isBouncing = true
+
+    // Return
+    setTimeout(() => {
+        char.targetY = limit
+        setTimeout(() => {
+            char.isBouncing = false
+        }, 500)
+    }, 300)
 }

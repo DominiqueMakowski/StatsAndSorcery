@@ -19,8 +19,8 @@ class Spell {
 const Compendium = [
     // OFFENSIVE SPELLS
     new Spell(
-        "FB1",
-        "Fireball",
+        "F1",
+        "Flame",
         SpellType.ATTACK,
         "",
         {
@@ -31,13 +31,12 @@ const Compendium = [
             beta_zero_max: 0.0,
             beta_zero_ci: 0.95,
             beta_x: 0,
-            beta_x_min: -0.5,
-            beta_x_max: 0.5,
+            beta_x_min: -0.3,
+            beta_x_max: 0.3,
             beta_x_ci: 0.95,
             duration: 1000,
             visual_type: "projectile",
-            visual_color: "orange",
-            animation_projectile: "img/fireball.png",
+            animation_projectile: "img/flame.png",
         },
         "#ffccbc"
     ),
@@ -54,8 +53,8 @@ const Compendium = [
             beta_zero_max: 0.0,
             beta_zero_ci: 0.95,
             beta_x: 0,
-            beta_x_min: -0.1,
-            beta_x_max: 0.1,
+            beta_x_min: -0.05,
+            beta_x_max: 0.05,
             beta_x_ci: 0.95,
             duration: 1000,
             visual_type: "ray",
@@ -87,8 +86,22 @@ const Compendium = [
         },
         "#e1bee7"
     ),
-    new Spell("SW1", "Strong Wind", SpellType.ATTACK, "Push Enemy (y+1)", { cost: 1, damage: 1, move_target_y: 1 }, "#a5d6a7"),
-    new Spell("SW2", "Strong Wind", SpellType.ATTACK, "Push Enemy (y-1)", { cost: 1, damage: 1, move_target_y: -1 }, "#a5d6a7"),
+    new Spell(
+        "SW1",
+        "Strong Wind",
+        SpellType.ATTACK,
+        "Push Enemy (y+1)",
+        { cost: 1, damage: 1, move_target_y: 1, animation_prespell: "img/wind.png" },
+        "#a5d6a7"
+    ),
+    new Spell(
+        "SW2",
+        "Strong Wind",
+        SpellType.ATTACK,
+        "Push Enemy (y-1)",
+        { cost: 1, damage: 1, move_target_y: -1, animation_prespell: "img/wind.png" },
+        "#a5d6a7"
+    ),
 
     // METAMAGIC SPELLS
     new Spell("A1", "Alteration", SpellType.MODIFIER, "B(x) - 1", { cost: 1, beta_x_modify: -1 }, "#ffe0b2"),
@@ -98,7 +111,7 @@ const Compendium = [
         "Alteration",
         SpellType.MODIFIER,
         "B(0) - 1",
-        { cost: 1, beta_zero_modify: -1, animation_prespell: "img/portal_png.png" },
+        { cost: 1, beta_zero_modify: -1, animation_prespell: "img/portal.png" },
         "#ffe0b2"
     ),
     new Spell(
@@ -106,7 +119,7 @@ const Compendium = [
         "Alteration",
         SpellType.MODIFIER,
         "B(0) + 1",
-        { cost: 1, beta_zero_modify: 1, animation_prespell: "img/portal_png.png" },
+        { cost: 1, beta_zero_modify: 1, animation_prespell: "img/portal.png" },
         "#ffe0b2"
     ),
 
