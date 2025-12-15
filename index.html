@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Stats & Sorcery</title>
+        <link rel="stylesheet" href="style.css" />
+    </head>
+    <body>
+        <div id="main-menu">
+            <h1>Stats & Sorcery</h1>
+            <button onclick="startGame('pve')">1 Player (vs AI)</button>
+            <button onclick="startGame('pvp')">2 Players (PvP)</button>
+        </div>
+
+        <div id="game-over-screen" style="display: none">
+            <h1 id="game-over-title">Game Over</h1>
+            <p id="game-over-message"></p>
+            <button onclick="location.reload()">Play Again</button>
+        </div>
+
+        <div id="main-layout">
+            <div id="top-bar">
+                <div id="turn-indicator">Player's Turn</div>
+            </div>
+
+            <div id="left-bar">
+                <div id="player-stats">
+                    <h3>Player</h3>
+                    <div id="player-hp-container" class="hp-container"></div>
+                    <p>Actions: <span id="player-actions"></span></p>
+                </div>
+            </div>
+
+            <div id="center-area">
+                <canvas id="game-canvas" width="800" height="600"></canvas>
+            </div>
+
+            <div id="right-bar">
+                <div id="enemy-stats">
+                    <h3>Enemy</h3>
+                    <div id="enemy-hp-container" class="hp-container"></div>
+                </div>
+                <button id="end-turn-btn">End Turn</button>
+            </div>
+
+            <div id="bottom-bar">
+                <div id="hand-container">
+                    <!-- Cards will be rendered here -->
+                </div>
+            </div>
+        </div>
+        <script src="js/spells.js"></script>
+        <script src="js/constants.js"></script>
+        <script src="js/entities.js"></script>
+        <script src="js/renderer.js"></script>
+        <script src="js/ui.js"></script>
+        <script src="js/game.js"></script>
+    </body>
+</html>
