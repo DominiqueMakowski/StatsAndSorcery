@@ -1,6 +1,8 @@
+![](img/banner.png)
+
 # Stats & Sorcery
 
-Educational game that develops the intuition of statistics (linear models).
+Educational game for developing your intuition of statistics.
 
 > Currently a proof-of-concept prototype.
 
