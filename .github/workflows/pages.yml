@@ -1,0 +1,40 @@
+# Build the game with Bun + Vite and publish dist/ to the root of the gh-pages branch on
+# every push to main. PR previews live next to it under pr-preview/ (see pr-preview.yml),
+# so the deploy cleans stale files but leaves that folder alone.
+#
+# One-time setup: repository Settings → Pages → Build and deployment →
+#   Source: "Deploy from a branch", Branch: gh-pages, folder: / (root).
+# The gh-pages branch is created by the first run of this workflow.
+
+name: Deploy main to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gh-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun test
+      - run: bun run build
+      - uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: dist
+          branch: gh-pages
+          clean: true
+          clean-exclude: pr-preview/
+          force: false

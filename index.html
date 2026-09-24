@@ -1,62 +1,85 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="description" content="Stats & Sorcery — a duelling card game that builds your intuition for statistics." />
         <title>Stats & Sorcery</title>
-        <link rel="stylesheet" href="style.css" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Patrick+Hand&family=Permanent+Marker&display=swap"
+            rel="stylesheet"
+        />
     </head>
     <body>
-        <div id="main-menu">
-            <img src="img/banner.png" alt="Stats & Sorcery" style="max-width: 60%; height: auto; margin-bottom: 20px" />
-            <button onclick="startGame('pve')">1 Player (PvE)</button>
-            <button onclick="startGame('pvp')">2 Players (PvP)</button>
-        </div>
-
-        <div id="game-over-screen" style="display: none">
-            <h1 id="game-over-title">Game Over</h1>
-            <p id="game-over-message"></p>
-            <button onclick="location.reload()">Play Again</button>
-        </div>
-
-        <div id="main-layout">
-            <div id="top-bar">
-                <div id="turn-indicator">Player's Turn</div>
-            </div>
-
-            <div id="left-bar">
-                <div id="player-stats">
-                    <h3>Player</h3>
-                    <div id="player-hp-container" class="hp-container"></div>
-                    <p>Actions: <span id="player-actions"></span></p>
+        <div id="app">
+            <section id="title-screen" class="screen">
+                <div class="title-wrap">
+                    <h1 class="title">Stats <span class="amp">&amp;</span> Sorcery</h1>
+                    <p class="tagline">every spell is a line. every line has uncertainty.</p>
+                    <canvas id="title-canvas" class="title-canvas" aria-hidden="true"></canvas>
+                    <nav class="menu">
+                        <button class="btn btn-primary" data-mode="run">Start a run</button>
+                        <button class="btn" data-mode="pve">Quick duel</button>
+                        <button class="btn" data-mode="pvp">Two players</button>
+                    </nav>
+                    <p class="fine-print">1 · 2 · 3 pick cards, Enter casts, Esc clears &nbsp;·&nbsp; <a href="#" id="tips-reset">show tips again</a></p>
                 </div>
-            </div>
+                <aside class="sticky sticky-howto" aria-label="How it works">
+                    <h2>how it works</h2>
+                    <p>Every spell is a line <b>y&nbsp;=&nbsp;β₀&nbsp;+&nbsp;β₁·x</b> drawn from you (x&nbsp;=&nbsp;0) toward your opponent (x&nbsp;=&nbsp;1). It hits if it passes through them.</p>
+                    <p>Each cast is a random draw. The hatched band is where <b>95%</b> of casts land.</p>
+                    <p>You get <b>2 ★</b> a turn. Modifiers change your next attack.</p>
+                </aside>
+                <div class="doodle doodle-star" aria-hidden="true">★</div>
+                <div class="doodle doodle-bolt" aria-hidden="true">⚡</div>
+                <div class="doodle doodle-zzz" aria-hidden="true">z z z</div>
+            </section>
 
-            <div id="center-area">
-                <canvas id="game-canvas" width="800" height="600"></canvas>
-            </div>
-
-            <div id="right-bar">
-                <div id="enemy-stats">
-                    <h3>Enemy</h3>
-                    <div id="enemy-hp-container" class="hp-container"></div>
-                    <p>Actions: <span id="enemy-actions"></span></p>
+            <section id="duel-screen" class="screen" hidden>
+                <header class="hud">
+                    <div class="wizard-panel" id="panel-left"></div>
+                    <div class="turn-banner" id="turn-banner"></div>
+                    <div class="wizard-panel is-right" id="panel-right"></div>
+                </header>
+                <main class="field-wrap" id="field-wrap">
+                    <canvas id="field"></canvas>
+                    <div class="coach" id="coach" hidden>
+                        <svg class="coach-owl" viewBox="0 0 48 54" aria-hidden="true">
+                            <path d="M10 16 C 7 30, 9 41, 24 47 C 39 41, 41 30, 38 16 Z" />
+                            <path d="M10 16 L6 5 L17 12 M38 16 L42 5 L31 12" />
+                            <circle class="eye" cx="18" cy="23" r="6.5" />
+                            <circle class="eye" cx="30" cy="23" r="6.5" />
+                            <circle class="pupil" cx="19" cy="23" r="2.3" />
+                            <circle class="pupil" cx="31" cy="23" r="2.3" />
+                            <path class="beak" d="M22 29 L24 34 L26 29 Z" />
+                            <path d="M15 36 q4 3 8 0 M25 36 q4 3 8 0 M13 41 q5 3 10 0 M25 41 q5 3 10 0" />
+                            <path d="M19 47 l-2 5 M21 47 l0 5 M27 47 l0 5 M29 47 l2 5" />
+                        </svg>
+                        <p class="coach-text"></p>
+                        <button class="coach-close" aria-label="Dismiss tip">×</button>
+                    </div>
+                </main>
+                <footer class="tray">
+                    <div class="hand" id="hand"></div>
+                    <div class="tray-actions">
+                        <button class="btn btn-primary btn-cast" id="cast-btn">Cast!</button>
+                        <p class="tray-hint" id="tray-hint"></p>
+                    </div>
+                </footer>
+                <div class="corner-actions">
+                    <button class="link-btn" id="mute-btn">♪ sound on</button>
+                    <button class="link-btn" id="quit-btn">✕ quit</button>
                 </div>
-                <button id="end-turn-btn">End Turn</button>
+            </section>
+
+            <div class="overlay" id="overlay" hidden>
+                <div class="overlay-content" id="overlay-content"></div>
             </div>
 
-            <div id="bottom-bar">
-                <div id="hand-container">
-                    <!-- Cards will be rendered here -->
-                </div>
-            </div>
+            <div class="toast" id="toast" role="status" aria-live="polite"></div>
         </div>
-        <script src="js/spells.js"></script>
-        <script src="js/characters.js"></script>
-        <script src="js/constants.js"></script>
-        <script src="js/entities.js"></script>
-        <script src="js/renderer.js"></script>
-        <script src="js/ui.js"></script>
-        <script src="js/game.js"></script>
+        <script type="module" src="/src/main.ts"></script>
     </body>
 </html>
