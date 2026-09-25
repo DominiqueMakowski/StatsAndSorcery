@@ -90,6 +90,7 @@ src/ui/        DOM
   actionList.ts  the "Action list" page: every action by type, sorted by when you can first use it
 src/audio/sfx.ts  WebAudio synth; mute persisted in localStorage
 src/main.ts    screens: title, run intro → duel → reward → …, result scrolls, portraits, dev hooks
+src/og.ts      the 1200×630 social card (og.html, dev only); `bun run og` renders it to public/og.png
 src/styles/main.css  the whole notebook look; CSS variables at the top
 ```
 
@@ -128,6 +129,7 @@ bun run dev        # Vite dev server (honours $PORT; .claude/launch.json uses au
 bun test           # core rules + statistics tests (Monte Carlo vs analytic hit chance, band coverage)
 bun run typecheck  # tsc --noEmit
 bun run build      # tsc && vite build → dist/ (relative base, works on GitHub Pages)
+bun run og         # re-render the social card public/og.png (needs Chrome or Edge; commit the PNG)
 ```
 
 **Deployment:** two workflows publish to the `gh-pages` branch (Pages source: "Deploy from a branch", `gh-pages`, root). `pages.yml` builds every push to `main` into the branch root, cleaning stale files but keeping `pr-preview/`. `pr-preview.yml` builds every pull request into `pr-preview/pr-<n>/` and comments the link on the PR. Both work because Vite's `base` is `./` (relative): keep it that way. Never commit `dist/`; it is gitignored. Never edit the `gh-pages` branch by hand.

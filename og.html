@@ -1,0 +1,31 @@
+<!doctype html>
+<!-- Dev-only page: the 1200×630 social card, drawn in code. `bun run og` renders it to public/og.png. -->
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Stats & Sorcery social card</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Patrick+Hand&family=Permanent+Marker&display=block"
+            rel="stylesheet"
+        />
+        <style>
+            html,
+            body {
+                margin: 0;
+                width: 1200px;
+                height: 630px;
+                overflow: hidden;
+                background: #f6f1e2;
+            }
+            canvas {
+                display: block;
+            }
+        </style>
+    </head>
+    <body>
+        <canvas id="og" width="1200" height="630"></canvas>
+        <script type="module" src="/src/og.ts"></script>
+    </body>
+</html>
