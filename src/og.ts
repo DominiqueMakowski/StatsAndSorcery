@@ -1,14 +1,22 @@
-// The 1200×630 social card (og:image), drawn with the same pens as the game: a notebook page
-// with the title, a Flame's cone-shaped 95% band flying at Harry Plotter, and where 20 shots landed.
-// Rendered to public/og.png by scripts/og.ts; open /og.html on the dev server to tweak it.
+// The 1200×630 social card (og:image) and, with ?banner, the wider README banner, drawn with the
+// same pens as the game: a notebook page with the title, a Flame's cone-shaped 95% band flying at
+// Harry Plotter, and where 20 shots landed. Rendered to PNGs by scripts/og.ts; open /og.html (or
+// /og.html?banner) on the dev server to tweak them.
 
 import { Characters } from "./content/characters"
 import { createRng } from "./core/rng"
 import { burstPath, hatch, INK, jitter, roughArrow, roughEllipse, roughLine, roughPoly, scribble, starPath, withAlpha, type Pt } from "./render/sketch"
 import { drawWizard } from "./render/wizard"
 
-const W = 1200
+const BANNER = new URLSearchParams(location.search).has("banner")
+const W = BANNER ? 1600 : 1200
 const H = 630
+/** Where things sit: the banner is the card stretched sideways, with a longer shot and a bigger title. */
+const L = BANNER
+    ? { title: [150, 150], titleSize: 116, tagline: [162, 238], taglineSize: 46, lx: 270, rx: 1450, sticky: [1350, 56] }
+    : { title: [140, 140], titleSize: 94, tagline: [150, 222], taglineSize: 40, lx: 230, rx: 1060, sticky: [985, 52] }
+/** Stretch a card x-coordinate across the banner's width (for the doodles). */
+const sx = (x: number) => (BANNER ? 96 + ((x - 96) * (W - 96)) / (1200 - 96) : x)
 const FIRE = "#e2492b"
 const MARKER = "'Permanent Marker', cursive"
 const HAND = "'Caveat', cursive"
@@ -52,13 +60,13 @@ function paper(ctx: CanvasRenderingContext2D) {
 
 function title(ctx: CanvasRenderingContext2D) {
     ctx.save()
-    ctx.translate(140, 140)
+    ctx.translate(L.title[0], L.title[1])
     ctx.rotate(-0.035)
     ctx.textBaseline = "alphabetic"
     const parts: [string, string, string][] = [
-        ["Stats ", `94px ${MARKER}`, INK.pen],
-        ["&", `700 98px ${HAND}`, INK.red],
-        [" Sorcery", `94px ${MARKER}`, INK.pen],
+        ["Stats ", `${L.titleSize}px ${MARKER}`, INK.pen],
+        ["&", `700 ${Math.round(L.titleSize * 1.04)}px ${HAND}`, INK.red],
+        [" Sorcery", `${L.titleSize}px ${MARKER}`, INK.pen],
     ]
     let x = 0
     for (const [text, font, color] of parts) {
@@ -72,9 +80,10 @@ function title(ctx: CanvasRenderingContext2D) {
     ctx.restore()
 
     ctx.save()
-    ctx.font = `700 40px ${HAND}`
+    const [tx, ty] = L.tagline
+    ctx.font = `700 ${L.taglineSize}px ${HAND}`
     ctx.fillStyle = INK.pencil
-    ctx.fillText("a wizard duelling game to build your statistical intuition", 150, 222)
+    ctx.fillText("a wizard duelling game to build your statistical intuition", tx, ty)
     // A highlighter swipe under "statistical intuition".
     const before = ctx.measureText("a wizard duelling game to build your ").width
     const hl = ctx.measureText("statistical intuition").width
@@ -83,15 +92,14 @@ function title(ctx: CanvasRenderingContext2D) {
     ctx.lineWidth = 16
     ctx.lineCap = "round"
     ctx.beginPath()
-    roughLine(ctx, 150 + before, 214, 150 + before + hl, 211, 5, 1.5, 1)
+    roughLine(ctx, tx + before, ty - 8, tx + before + hl, ty - 11, 5, 1.5, 1)
     ctx.stroke()
     ctx.restore()
 }
 
 function scene(ctx: CanvasRenderingContext2D) {
-    const lx = 230
+    const { lx, rx } = L
     const ly = 470
-    const rx = 1060
     const ry = 440
     const size = 190
     const x0 = lx + 62
@@ -184,17 +192,22 @@ function scene(ctx: CanvasRenderingContext2D) {
     ctx.lineWidth = 2
     ctx.font = `700 34px ${HAND}`
     ctx.textAlign = "center"
-    ctx.fillText("95% band", 640, 318)
-    roughArrow(ctx, 640, 326, 660, 364, 21, 11)
+    // Points along the band's upper and lower edges, t ∈ [0, 1] from the staff to the target.
+    const upper = (t: number): Pt => [x0 + (x1 - x0) * t, y0 - 6 + (y1 - 96 - (y0 - 6)) * t]
+    const lower = (t: number): Pt => [x0 + (x1 - x0) * t, y0 + 6 + (y1 + 96 - (y0 + 6)) * t]
+    const [ax, ay] = upper(0.55)
+    ctx.fillText("95% band", ax - 20, ay - 46)
+    roughArrow(ctx, ax - 20, ay - 38, ax, ay - 2, 21, 11)
     ctx.fillStyle = INK.pencil
     ctx.font = `700 30px ${HAND}`
-    subscripted(ctx, [["y = β", ""], ["0", "sub"], [" + β", ""], ["1", "sub"], [" · x", ""]], 480, 520)
+    const [ex, ey] = lower(0.3)
+    subscripted(ctx, [["y = β", ""], ["0", "sub"], [" + β", ""], ["1", "sub"], [" · x", ""]], ex, ey + 70)
     ctx.fillStyle = INK.red
     ctx.strokeStyle = INK.red
     ctx.font = `700 28px ${HAND}`
     ctx.textAlign = "left"
-    ctx.fillText("1 in 20 lands outside!", 700, 600)
-    roughArrow(ctx, 890, 578, x1 - 6, y1 + 2.35 * 49 + 10, 23, 10)
+    ctx.fillText("1 in 20 lands outside!", x1 - 265, 600)
+    roughArrow(ctx, x1 - 75, 578, x1 - 6, y1 + 2.35 * 49 + 10, 23, 10)
     ctx.restore()
 }
 
@@ -213,7 +226,7 @@ function subscripted(ctx: CanvasRenderingContext2D, parts: [string, string][], x
 
 function sticky(ctx: CanvasRenderingContext2D) {
     ctx.save()
-    ctx.translate(985, 52)
+    ctx.translate(L.sticky[0], L.sticky[1])
     ctx.rotate(0.07)
     ctx.shadowColor = "rgba(80, 60, 20, 0.22)"
     ctx.shadowBlur = 12
@@ -249,12 +262,12 @@ function doodles(ctx: CanvasRenderingContext2D) {
         [150, 300, 11, 2],
         [1140, 560, 12, 3],
     ]) {
-        starPath(ctx, x, y, r, s)
+        starPath(ctx, sx(x), y, r, s)
         ctx.stroke()
     }
     ctx.fillStyle = withAlpha(INK.pen, 0.55)
     ctx.font = `700 26px ${HAND}`
-    ctx.fillText("z z z", 1110, 300)
+    ctx.fillText("z z z", W - 90, 300)
     ctx.strokeStyle = withAlpha(INK.pen, 0.35)
     ctx.lineWidth = 1.4
     scribble(ctx, 128, 590, 12, 4)
@@ -262,10 +275,10 @@ function doodles(ctx: CanvasRenderingContext2D) {
     roughPoly(
         ctx,
         [
-            [470, 262],
-            [458, 286],
-            [472, 284],
-            [462, 308],
+            [sx(470), 262],
+            [sx(470) - 12, 286],
+            [sx(470) + 2, 284],
+            [sx(470) - 8, 308],
         ],
         6,
         0.6,
@@ -278,8 +291,11 @@ function doodles(ctx: CanvasRenderingContext2D) {
 
 async function main() {
     await document.fonts.ready
-    await Promise.all([`94px ${MARKER}`, `700 40px ${HAND}`, `26px ${UI}`].map((f) => document.fonts.load(f, "Stats & Sorcery β₀")))
-    const ctx = (document.getElementById("og") as HTMLCanvasElement).getContext("2d")!
+    await Promise.all([`${L.titleSize}px ${MARKER}`, `700 ${L.taglineSize}px ${HAND}`, `26px ${UI}`].map((f) => document.fonts.load(f, "Stats & Sorcery β₀")))
+    const canvas = document.getElementById("og") as HTMLCanvasElement
+    canvas.width = W
+    document.body.style.width = `${W}px`
+    const ctx = canvas.getContext("2d")!
     ctx.lineCap = "round"
     ctx.lineJoin = "round"
     paper(ctx)
@@ -287,7 +303,7 @@ async function main() {
     doodles(ctx)
     scene(ctx)
     sticky(ctx)
-    // scripts/og.ts reads the pixels back out of the DOM, so the PNG is exactly 1200×630.
+    // scripts/og.ts reads the pixels back out of the DOM, so the PNG is exactly W×H.
     const out = document.createElement("pre")
     out.id = "png"
     out.hidden = true

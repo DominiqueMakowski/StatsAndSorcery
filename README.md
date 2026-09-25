@@ -1,4 +1,4 @@
-![](src/assets/banner.webp)
+![Stats & Sorcery: a doodled wizard casts a Flame at Harry Plotter through its hatched 95% band](docs/banner.png)
 
 # Stats & Sorcery
 
