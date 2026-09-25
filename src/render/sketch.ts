@@ -217,3 +217,14 @@ export function fraction(v: number): string {
     const glyph = ["", "¼", "½", "¾"][Math.round(quarters) % 4]
     return `${sign}${whole || !glyph ? whole : ""}${glyph}`
 }
+
+/** SVG points of a slightly wobbly five-pointed star in a 24×24 box: the action-point ★ on cards and in the HUD. */
+export function starPoints(seed: number): string {
+    const pts: string[] = []
+    for (let i = 0; i < 10; i++) {
+        const a = -Math.PI / 2 + (i / 10) * Math.PI * 2
+        const r = (i % 2 === 0 ? 10 : 4.6) * (1 + jitter(seed, i) * 0.08)
+        pts.push(`${(12 + Math.cos(a) * r).toFixed(1)},${(12 + Math.sin(a) * r).toFixed(1)}`)
+    }
+    return pts.join(" ")
+}

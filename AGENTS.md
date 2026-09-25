@@ -15,7 +15,7 @@ Design priorities, in order:
 
 The game teaches by **predict → act → observe → compare**, the loop that builds calibrated intuition:
 
-1. **Predict.** While planning you see only the parameters: the card (its spread, sketched and as "95% band ±…"), the alterations you've queued (β₀ +½, β₁ −½…), the axis labels in your own frame, the target's hitbox brackets and the mirrors. There is **no aim preview** (no band, no path) and **no hit chance**. You have to picture where the spell will go and how likely it is to land.
+1. **Predict.** While planning you see only the parameters: the card (its spread, sketched and as "95% band ±…"), the alterations you've queued (β₀ +2, β₁ −2…), the axis labels in your own frame, the target's hitbox brackets and the mirrors. There is **no aim preview** (no band, no path) and **no hit chance**. You have to picture where the spell will go and how likely it is to land.
 2. **Act.** Cast it (or move, or pass).
 3. **Observe.** When the spell flies, its true 95% band blooms from your staff, hangs for a moment, then collapses onto the line that was actually drawn. Right or wrong, you can see why.
 4. **Compare.** Exact odds appear only afterwards, as feedback to check your intuition against: Hoot's "missed at 90%?" note, and "landed" vs. "the odds said" on the result scroll.
@@ -31,14 +31,14 @@ Don't add aiming aids that do the judging for the player. What stays visible is 
 - A **card** shows one **action** (`Action` in code). Every action costs **action points**, drawn as ★ (`cost`; a character's per-turn budget is `ap`), and has a **type** (`kind`):
   - **Spells** (`"spell"`) are distributions over where a shot lands, and each one is a trade-off: precise (narrow band) but weak or costly, or powerful but wild. A new spell should sit at a new point on that trade-off, not just be better.
   - **Movements** (`"movement"`) change where you stand rather than the spell. Move is the only one for now.
-  - **Alterations** (`"alteration"`) change one parameter of your next spell, and are named with the statistical term so players pick up the vocabulary: **Intercept** (β₀, ±½), **Slope** (β₁, ±½), **SD ÷ 2** (σ). Their ± buttons show the actual change (+½, −½). They're unlocked after the first duel. Arc (β₀ +½ and β₁ −½ at once) exists but is out of the run for now, to keep things simple. Next to explore: curvature (a β₂·x² term, so spells can bend) and other tweaks to the distribution.
+  - **Alterations** (`"alteration"`) change one parameter of your next spell, and are named with the statistical term so players pick up the vocabulary: **Intercept** (β₀, ±2), **Slope** (β₁, ±2), **SD ÷ 2** (σ). Their ± buttons show the actual change (+2, −2: two lanes). They're unlocked after the first duel. Arc (β₀ +2 and β₁ −2 at once) exists but is out of the run for now, to keep things simple. Next to explore: curvature (a β₂·x² term, so spells can bend) and other tweaks to the distribution.
   - Wards and hexes (`"ward"`, `"hex"`) are opponent tricks for now (Draco's walls, Voldemode's Jinx).
 - Your **spellbook** is your deck: each turn you draw a hand of action cards from it.
 - The **Grimoire** is the book of every action you know (not built yet, see below).
 
 **Grimoire → spellbook → hand.** The plan: every action a player unlocks goes into their Grimoire, the big book of all known actions, each with a short plain-language page on what it does to the distribution. Before a duel, they pick N of them to form their spellbook, and each turn's hand is drawn from that. Players shape what *can* be drawn without controlling what *will* be: they manage odds, not outcomes, which is the game's lesson again (a deck is a distribution; drawing a hand is sampling without replacement). For now there's no Grimoire screen: each win adds its reward straight to the spellbook.
 
-**Mirrors.** The top and bottom edges of the field are mirrors (at ±1¼, a lane beyond the outer lanes): spells bounce off them, so a line aimed past the edge comes back in, and a wide band hugging an edge folds back on itself. Statistically the landing point is a *folded normal*: `foldedIntervalProb` in `stats.ts` sums the normal over every mirror image of the target, so hit chances stay exact, and the drawn band is the unfolded band plus its reflections. Bank shots are modest with ±½ slopes; bigger slope alterations would make them a real tactic.
+**Mirrors.** The top and bottom edges of the field are mirrors (at ±4, a lane beyond the outer lanes): spells bounce off them, so a line aimed past the edge comes back in, and a wide band hugging an edge folds back on itself. Statistically the landing point is a *folded normal*: `foldedIntervalProb` in `stats.ts` sums the normal over every mirror image of the target, so hit chances stay exact, and the drawn band is the unfolded band plus its reflections. Bank shots are modest with ±2 slopes; bigger slope alterations would make them a real tactic.
 
 **Beyond lines.** Spells don't have to stay linear models. Future spells can draw on other statistical ideas, as long as each fits in one plain sentence and its odds stay exact. For example **Fire Rain**, an area-of-effect spell that falls at a point drawn from a Normal distribution with a given location and SD and hits everything within a radius: it teaches location vs. scale. Skewed, heavy-tailed or bimodal spells could follow. Where there's no closed form, estimate the hit chance by Monte Carlo with common random numbers, as `hitChance` in `shot.ts` already does with wards.
 
@@ -66,7 +66,7 @@ If you add UI, ask: "would this be on the page, drawn with these pens?" A modal 
 ```
 src/core/      pure rules, no DOM, fully tested
   stats.ts       normal CDF, 95% z, heightAt(line, x): the maths behind the bands
-  shot.ts        field geometry (9 lanes at ¼ steps, hitbox ±0.18), attackLine, resolveShot, hitChance
+  shot.ts        field geometry (7 whole-number lanes −3 … 3, hitbox ±0.72, mirrors ±4), attackLine, resolveShot, hitChance
   duel.ts        the Duel state machine: hands, AP, wards, hexes; emits DuelEvent[]; previewPlan()
   ai.ts          enumerates every legal play sequence; scores damage dealt minus caution × threatAt(where it ends up); softmax by sloppiness
   rng.ts         seeded Mulberry32 + Box–Muller; duels and tests are reproducible
@@ -101,11 +101,11 @@ src/styles/main.css  the whole notebook look; CSS variables at the top
 
 ## Balance notes
 
-- Lanes are ¼ apart, less than a hitbox is tall (±0.18), so one lane off someone's line only partly dodges them. That gradient is what makes duel 1 a game: Flame hits 83% aligned, 30% one lane off, ~1% two lanes off, so "shoot now or line up first?" is a real call made by reading the band. With the old ½ lanes every shot was all or nothing, and the best play was always to stand still and fire. A spread (σ at the target) around 0.1 is reliable and around 0.3 a gamble.
-- Other hit chances (internal, never shown while aiming): Frost Ray ≈ 100% for 2 ★, Chain Lightning 54% for 2 damage. A jinxed Flame drops to 51%; with SD ÷ 2 it rises to 99%. Intercept and Slope move a line by ½, i.e. two lanes.
-- Flame has a precise start (β₀ σ 0.01) but a wobbly angle (β₁ σ 0.13), so its band is a cone: ±0.02 at the staff, ±0.13 at mid-field, ±0.26 at the target. It's the first picture of "uncertainty grows with distance".
+- Seven lanes at whole numbers (−3 … 3) so the axis never shows fractions. A lane (1) is less than a hitbox is tall (±0.72), so one lane off someone's line only partly dodges them. That gradient is what makes duel 1 a game: Flame hits 83% aligned, 30% one lane off, ~1% two lanes off, so "shoot now or line up first?" is a real call. With lanes wider than a hitbox every shot was all or nothing, and the best play was always to stand still and fire. A spread (σ at the target) around 0.4 is reliable and around 1.2 a gamble. Everything is proportional: to rescale the field, scale lanes, hitbox, mirrors, spreads, steps and wards together.
+- Other hit chances (internal, never shown while aiming): Frost Ray ≈ 100% for 2 ★, Chain Lightning 54% for 2 damage. A jinxed Flame drops to 51%; with SD ÷ 2 it rises to 99%. Intercept and Slope move a line by 2, i.e. two lanes.
+- Flame has a precise start (β₀ σ 0.04) but a wobbly angle (β₁ σ 0.52), so its band is a cone: ±0.08 at the staff, ±0.5 at mid-field, ±1.0 (about a lane) at the target. It's the first picture of "uncertainty grows with distance".
 - **AI caution.** Hitting and dodging cost the same 1 ★, so an AI that only counts damage dealt never dodges. Each AI subtracts `caution` × the damage it could take where it ends its turn (`threatAt`: the foe's best mix of moving into line and firing). Low caution slugs it out, high caution hits and runs or keeps away. Caution halves every 3 turns without a hit ("impatience"), so two careful wizards can't circle each other forever (there's a test for that). Harry: caution 0.8, sloppiness 0.4, 4 ♥, starts a lane up so turn one is already a choice.
-- Simulated AI-vs-AI with a decent player (sloppiness 0.3): Harry is won ~85% of the time in ~8–14 of your turns, Draco 61–70% (Slope vs. Intercept), Voldemode ~55%. Re-check these after any balance change.
+- Simulated AI-vs-AI with a decent player (sloppiness 0.3): Harry is won ~85% of the time in ~7–11 of your turns, Draco 61–68% (Slope vs. Intercept), Voldemode ~54%. Re-check these after any balance change.
 - Apprentice: 5 HP, 2 ★, hand of 3, spellbook of 4 Flame + 3 Move. Each win gives +1 ♥ and one action from that stage's `rewards` in `run.ts`; full heal between duels.
 - One idea per opponent. Harry Plotter (Flame + Move only, dodges) teaches reading the band. Draco Malfit (walls at mid-field) teaches slope vs. intercept: changing the slope swings the line into a wall, raising the intercept clears it. Lord Voldemode (Jinx doubles your spread) teaches variance: SD ÷ 2, or a sure 1 over a risky 2.
 - With 2 ★, a spell plus two alterations doesn't fit in one turn; that's what Arc (both at once) was for, if walls ever need it again.

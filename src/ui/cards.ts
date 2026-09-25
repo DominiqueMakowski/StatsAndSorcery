@@ -1,10 +1,10 @@
 // Cards are index cards taped to the desk: a name in marker, a little pen sketch of what
 // the action does to a line, and a scribbled description.
 
-import { attackLine } from "../core/shot"
+import { attackLine, FIELD } from "../core/shot"
 import { heightAt, Z95 } from "../core/stats"
 import type { Direction, Action } from "../core/types"
-import { fraction, jitter } from "../render/sketch"
+import { fraction, jitter, starPoints } from "../render/sketch"
 
 export interface CardOptions {
     order?: number
@@ -15,9 +15,11 @@ export interface CardOptions {
     onHover?: (dir: Direction | undefined | null) => void
 }
 
-// Mini graph geometry: x ∈ [0, 1] → [12, 112], y ∈ [−1.2, 1.2] → [58, 2].
+// Mini graph geometry: x ∈ [0, 1] → [12, 112], y ∈ [−1.2, 1.2] → [58, 2], in sketch units where a
+// lane is ¼. Field values (spreads, shifts, steps) are converted with K.
 const gx = (x: number) => 12 + x * 100
 const gy = (y: number) => 30 - y * 23
+const K = 0.25 / FIELD.laneStep
 
 let clipCounter = 0
 
@@ -113,8 +115,8 @@ export function actionGraph(action: Action): string {
         case "spell": {
             const line = attackLine(action)
             body = band(
-                (x) => heightAt(line, x).mean,
-                (x) => Z95 * heightAt(line, x).sd,
+                (x) => K * heightAt(line, x).mean,
+                (x) => K * Z95 * heightAt(line, x).sd,
                 seed
             )
             body += penLine(
@@ -151,7 +153,7 @@ export function actionGraph(action: Action): string {
                 )
                 body += target(1, 0, seed + 7)
             } else if (action.dBeta0) {
-                const d = action.dBeta0 * 1.4
+                const d = K * action.dBeta0 * 1.4
                 body = penLine(
                     [
                         [0, -0.3],
@@ -212,7 +214,7 @@ export function actionGraph(action: Action): string {
             }
             break
         case "movement": {
-            const to = action.step >= 1 ? 0.9 : 0.5
+            const to = K * action.step >= 1 ? 0.9 : 0.5
             body = `<circle cx="${gx(0.25)}" cy="${gy(-0.45)}" r="4.5" fill="none" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="2 2"/>`
             body += `<circle cx="${gx(0.25)}" cy="${gy(to)}" r="5" fill="currentColor" fill-opacity="0.25" stroke="currentColor" stroke-width="1.6"/>`
             body += arrow(0.25, -0.3, to - 0.24, seed + 8)
@@ -271,7 +273,7 @@ function hashId(id: string): number {
 function statsLine(action: Action): string {
     if (action.kind !== "spell") return ""
     const h = heightAt(attackLine(action), 1)
-    return `<div class="card-stats"><span>95% band <b>±${(Z95 * h.sd).toFixed(2)}</b></span><span>dmg <b>${action.damage}</b></span></div>`
+    return `<div class="card-stats"><span>95% band <b>±${(Z95 * h.sd).toFixed(1)}</b></span><span>dmg <b>${action.damage}</b></span></div>`
 }
 
 export function createCard(action: Action, opts: CardOptions): HTMLElement {
@@ -287,7 +289,7 @@ export function createCard(action: Action, opts: CardOptions): HTMLElement {
 
     el.innerHTML = `
         <span class="card-tape">${action.kind}</span>
-        <div class="card-cost" title="Action points">${action.cost}</div>
+        <div class="card-cost" title="Action points"><svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="${starPoints(hashId(action.id))}"/></svg><span>${action.cost}</span></div>
         ${opts.order ? `<div class="card-order">${opts.order}</div>` : ""}
         <div class="card-head">
             <span class="card-name">${action.name}</span>

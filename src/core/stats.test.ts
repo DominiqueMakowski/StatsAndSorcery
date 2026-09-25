@@ -22,6 +22,9 @@ describe("normal distribution", () => {
     })
 })
 
+// Field values below are in lanes, so the tests don't care what a lane measures.
+const L = FIELD.laneStep
+
 describe("spell uncertainty", () => {
     const flame = getAction("flame") as SpellAction
     const lightning = getAction("chain_lightning") as SpellAction
@@ -53,8 +56,8 @@ describe("spell uncertainty", () => {
         const rng = createRng(3)
         for (const [targetY, mods] of [
             [0, { dBeta0: 0, dBeta1: 0, sdScale: 1 }],
-            [0.5, { dBeta0: 0.5, dBeta1: 0, sdScale: 1 }],
-            [0.5, { dBeta0: 0, dBeta1: 0, sdScale: 1 }],
+            [2 * L, { dBeta0: 2 * L, dBeta1: 0, sdScale: 1 }],
+            [2 * L, { dBeta0: 0, dBeta1: 0, sdScale: 1 }],
         ] as const) {
             const line = attackLine(lightning, mods)
             const exact = hitChance(line, "left", 0, targetY, [])
@@ -67,25 +70,25 @@ describe("spell uncertainty", () => {
 
     test("wards make slope and intercept different", () => {
         // Enemy one lane up; the ward sits on the straight line between the wizards.
-        const ward: Ward = { id: 1, owner: "right", x: 0.5, y: 0.25, halfHeight: 0.15 }
-        const shifted = attackLine(frost, { dBeta0: 0.5, dBeta1: 0, sdScale: 1 })
-        const tilted = attackLine(frost, { dBeta0: 0, dBeta1: 0.5, sdScale: 1 })
+        const ward: Ward = { id: 1, owner: "right", x: 0.5, y: L, halfHeight: 0.6 * L }
+        const shifted = attackLine(frost, { dBeta0: 2 * L, dBeta1: 0, sdScale: 1 })
+        const tilted = attackLine(frost, { dBeta0: 0, dBeta1: 2 * L, sdScale: 1 })
         // Without the ward both corrections reach the target equally well...
-        expect(hitChance(tilted, "left", 0, 0.5, [])).toBeCloseTo(hitChance(shifted, "left", 0, 0.5, []), 1)
+        expect(hitChance(tilted, "left", 0, 2 * L, [])).toBeCloseTo(hitChance(shifted, "left", 0, 2 * L, []), 1)
         // ...with it, tilting runs straight into the ward while shifting passes over it.
-        expect(hitChance(tilted, "left", 0, 0.5, [ward])).toBeLessThan(0.05)
-        expect(hitChance(shifted, "left", 0, 0.5, [ward])).toBeGreaterThan(0.8)
+        expect(hitChance(tilted, "left", 0, 2 * L, [ward])).toBeLessThan(0.05)
+        expect(hitChance(shifted, "left", 0, 2 * L, [ward])).toBeGreaterThan(0.8)
 
         // Aligned wizards: only an arc (up, then back down) gets around the ward.
         const lowWard: Ward = { ...ward, y: 0 }
         expect(hitChance(attackLine(frost), "left", 0, 0, [lowWard])).toBeLessThan(0.05)
-        const arc = attackLine(frost, { dBeta0: 0.5, dBeta1: -0.5, sdScale: 1 })
+        const arc = attackLine(frost, { dBeta0: 2 * L, dBeta1: -2 * L, sdScale: 1 })
         expect(hitChance(arc, "left", 0, 0, [lowWard])).toBeGreaterThan(0.8)
     })
 
     test("right-side wizards shoot in their own mirrored frame", () => {
-        const line = attackLine(frost, { dBeta0: 0, dBeta1: -0.5, sdScale: 1 })
-        expect(hitChance(line, "right", 0.5, 0, [])).toBeGreaterThan(0.8)
+        const line = attackLine(frost, { dBeta0: 0, dBeta1: -2 * L, sdScale: 1 })
+        expect(hitChance(line, "right", 2 * L, 0, [])).toBeGreaterThan(0.8)
     })
 })
 
@@ -95,26 +98,27 @@ describe("mirrors", () => {
     const m = FIELD.mirror
 
     test("heights past a mirror fold back into the field", () => {
-        expect(reflect(0.5)).toBeCloseTo(0.5, 9)
+        expect(reflect(2 * L)).toBeCloseTo(2 * L, 9)
         expect(reflect(m + 0.3)).toBeCloseTo(m - 0.3, 9)
         expect(reflect(-m - 0.3)).toBeCloseTo(-m + 0.3, 9)
         expect(reflect(3 * m + 0.2)).toBeCloseTo(-m + 0.2, 9) // off the top, then off the bottom
     })
 
     test("a bank shot off the top mirror lands on a target it would otherwise miss", () => {
-        // From the top lane, slope +½ would end at 1½; the mirror at 1¼ sends it back down to 1.
-        const line = attackLine(frost, { dBeta0: 0, dBeta1: 0.5, sdScale: 1 })
-        expect(hitChance(line, "left", 1, 1, [])).toBeGreaterThan(0.99)
-        expect(resolveShot(line, "left", 1, 1, [], createRng(5)).outcome).toBe("hit")
+        // From the top lane, a slope of 2 lanes would end two lanes up; the mirror one lane above sends it back down.
+        const top = FIELD.yMax
+        const line = attackLine(frost, { dBeta0: 0, dBeta1: 2 * L, sdScale: 1 })
+        expect(hitChance(line, "left", top, top, [])).toBeGreaterThan(0.99)
+        expect(resolveShot(line, "left", top, top, [], createRng(5)).outcome).toBe("hit")
     })
 
     test("exact hit chance with bounces agrees with simulation (a folded normal)", () => {
         const rng = createRng(9)
         // Wide lightning along the top edge, and two steep bank shots: each folds a lot of mass back.
         for (const [casterY, targetY, dBeta1] of [
-            [1, 1, 0],
-            [0.5, 0.75, 1.5],
-            [-1, -0.5, -1],
+            [FIELD.yMax, FIELD.yMax, 0],
+            [2 * L, 3 * L, 6 * L],
+            [FIELD.yMin, FIELD.yMin + L, -4 * L],
         ] as const) {
             const line = attackLine(lightning, { dBeta0: 0, dBeta1, sdScale: 1 })
             const exact = hitChance(line, "left", casterY, targetY, [])
@@ -126,10 +130,10 @@ describe("mirrors", () => {
     })
 
     test("bounce points sit where the line meets a mirror", () => {
-        const xs = bouncePoints(1, 0.5)
+        const xs = bouncePoints(FIELD.yMax, 2 * L) // top lane, climbing two lanes: meets the mirror halfway
         expect(xs).toHaveLength(1)
         expect(xs[0]).toBeCloseTo(0.5, 9)
-        expect(bouncePoints(0, 0.3)).toHaveLength(0)
-        expect(bouncePoints(0, 4)).toHaveLength(2) // unfolded it climbs from 0 to 4, crossing 1¼ and 3¾
+        expect(bouncePoints(0, 1.2 * L)).toHaveLength(0)
+        expect(bouncePoints(0, 4 * m)).toHaveLength(2) // unfolded it climbs from 0 to 4m, crossing m and 3m
     })
 })

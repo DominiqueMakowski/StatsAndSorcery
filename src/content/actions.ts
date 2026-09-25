@@ -1,7 +1,7 @@
 import type { Action } from "../core/types"
 
-// Field geometry reminder: lanes are ½ apart (y ∈ {−1, −½, 0, ½, 1}) and a wizard's
-// hitbox is ±0.18, so a shot's spread (σ at the target) of ~0.1 is "reliable" and ~0.3 is a gamble.
+// Field geometry reminder: lanes are 1 apart (y ∈ {−3 … 3}) and a wizard's hitbox is ±0.72,
+// so a shot's spread (σ at the target) of ~0.4 is "reliable" and ~1.2 is a gamble.
 
 export const Actions: Record<string, Action> = {
     // ---- Actions: each one trades precision against power ----
@@ -13,8 +13,8 @@ export const Actions: Record<string, Action> = {
         cost: 1,
         damage: 1,
         // A precise start but a wobbly angle: the band opens like a cone.
-        beta0: { mean: 0, sd: 0.01 },
-        beta1: { mean: 0, sd: 0.13 },
+        beta0: { mean: 0, sd: 0.04 },
+        beta1: { mean: 0, sd: 0.52 },
         visual: "projectile",
         description: "A mild fireball. Starts true, wobbles as it flies.",
     },
@@ -25,8 +25,8 @@ export const Actions: Record<string, Action> = {
         element: "frost",
         cost: 2,
         damage: 1,
-        beta0: { mean: 0, sd: 0.02 },
-        beta1: { mean: 0, sd: 0.03 },
+        beta0: { mean: 0, sd: 0.08 },
+        beta1: { mean: 0, sd: 0.12 },
         visual: "ray",
         description: "Slow to channel, but almost never strays.",
     },
@@ -37,8 +37,8 @@ export const Actions: Record<string, Action> = {
         element: "storm",
         cost: 1,
         damage: 2,
-        beta0: { mean: 0, sd: 0.14 },
-        beta1: { mean: 0, sd: 0.2 },
+        beta0: { mean: 0, sd: 0.56 },
+        beta1: { mean: 0, sd: 0.8 },
         visual: "bolt",
         description: "Devastating, if it lands.",
     },
@@ -50,7 +50,7 @@ export const Actions: Record<string, Action> = {
         kind: "movement",
         element: "nature",
         cost: 1,
-        step: 0.25,
+        step: 1,
         description: "Step one lane up or down.",
     },
 
@@ -62,8 +62,8 @@ export const Actions: Record<string, Action> = {
         kind: "alteration",
         element: "arcane",
         cost: 1,
-        dBeta0: 0.5,
-        description: "Raise or lower your next spell's intercept by ½: the whole line moves.",
+        dBeta0: 2,
+        description: "Raise or lower your next spell's intercept by 2: the whole line moves.",
     },
     slope: {
         id: "slope",
@@ -72,8 +72,8 @@ export const Actions: Record<string, Action> = {
         kind: "alteration",
         element: "arcane",
         cost: 1,
-        dBeta1: 0.5,
-        description: "Raise or lower your next spell's slope by ½: it climbs or dips as it flies.",
+        dBeta1: 2,
+        description: "Raise or lower your next spell's slope by 2: it climbs or dips as it flies.",
     },
     halve_sd: {
         id: "halve_sd",
@@ -89,12 +89,12 @@ export const Actions: Record<string, Action> = {
     arc: {
         id: "arc",
         name: "Arc",
-        symbol: "β₀+½, β₁−½",
+        symbol: "β₀+2, β₁−2",
         kind: "alteration",
         element: "arcane",
         cost: 1,
-        dBeta0: 0.5,
-        dBeta1: -0.5,
+        dBeta0: 2,
+        dBeta1: -2,
         description: "Intercept up, slope down, at once: lob it over a wall.",
     },
 
@@ -106,7 +106,7 @@ export const Actions: Record<string, Action> = {
         element: "shadow",
         cost: 1,
         distance: 0.5,
-        halfHeight: 0.15,
+        halfHeight: 0.6,
         enemyOnly: true,
         description: "A wall at mid-field that absorbs one shot.",
     },

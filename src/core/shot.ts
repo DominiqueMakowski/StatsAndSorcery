@@ -7,20 +7,21 @@ import type { AttackMods, SpellAction, CastResult, Side, Ward } from "./types"
 import type { Rng } from "./rng"
 
 export const FIELD = {
-    yMin: -1,
-    yMax: 1,
+    /** Seven lanes at whole numbers, −3 … +3, so every label on the axis is an integer. */
+    yMin: -3,
+    yMax: 3,
     /**
-     * Lanes are ¼ apart, less than a hitbox is tall: one step off someone's line only partly
+     * Lanes are 1 apart, less than a hitbox is tall: one step off someone's line only partly
      * dodges them (Flame: 83% aligned, ~30% one lane off, ~1% two lanes off).
      */
-    laneStep: 0.25,
+    laneStep: 1,
     /** Half-height of a wizard's hitbox. */
-    hitHalf: 0.18,
+    hitHalf: 0.72,
     /** Mirrors run along the top and bottom of the field, a lane beyond the outer lanes: spells bounce off them. */
-    mirror: 1.25,
+    mirror: 4,
 }
 
-export const LANES = Array.from({ length: 9 }, (_, i) => FIELD.yMin + i * FIELD.laneStep)
+export const LANES = Array.from({ length: 7 }, (_, i) => FIELD.yMin + i * FIELD.laneStep)
 
 export function toWorldX(side: Side, localX: number): number {
     return side === "left" ? localX : 1 - localX

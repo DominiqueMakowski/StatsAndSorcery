@@ -88,7 +88,7 @@ describe("AI", () => {
         const duel = new Duel({ left: Characters.apprentice, right: aimer, seed: 5 })
         duel.start()
         duel.endTurn()
-        duel.wizards.left.y = 0.5
+        duel.wizards.left.y = 2 * FIELD.laneStep
         const plan = planTurn(duel, "right", 0, createRng(1))
         const preview = previewPlan(duel, "right", plan)!
         expect(preview.attacks).toHaveLength(1)

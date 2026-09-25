@@ -22,7 +22,9 @@ export const ELEMENT_COLORS: Record<Element, string> = {
     shadow: "#c9418a",
 }
 
-const Y_VIEW = 1.35 // visible half-height in field units (the mirrors sit at ±FIELD.mirror, just inside)
+const Y_VIEW = 4.2 // visible half-height in field units (the mirrors sit at ±FIELD.mirror, just inside)
+/** A wizard doodle is about two lanes tall. */
+const WIZARD_SIZE = 2.05
 const FONT_HAND = "'Caveat', 'Patrick Hand', cursive"
 const FONT_MARKER = "'Permanent Marker', 'Patrick Hand', cursive"
 const POW_WORDS = ["POW!", "BAM!", "ZAP!", "WHAM!", "BONK!"]
@@ -459,12 +461,10 @@ export class Battlefield {
         // Lane guides: faint pencil dashes.
         ctx.lineWidth = 1
         ctx.setLineDash([7, 7])
-        for (const half of [true, false]) {
-            ctx.strokeStyle = withAlpha(INK.pencil, half ? 0.35 : 0.16)
-            ctx.beginPath()
-            for (const y of LANES.filter((l) => isHalfLane(l) === half)) roughLine(ctx, left, this.sy(y), right, this.sy(y), seed + y * 10, 0.8, 1)
-            ctx.stroke()
-        }
+        ctx.strokeStyle = withAlpha(INK.pencil, 0.35)
+        ctx.beginPath()
+        for (const y of LANES) roughLine(ctx, left, this.sy(y), right, this.sy(y), seed + y * 10, 0.8, 1)
+        ctx.stroke()
         // Mirrors along the top and bottom edges, hatched on the back like in a physics diagram.
         ctx.setLineDash([])
         ctx.strokeStyle = withAlpha(INK.pen, 0.75)
@@ -518,8 +518,7 @@ export class Battlefield {
         roughLine(ctx, left, top, left, bottom, seed + 8, 1)
         roughLine(ctx, right, top, right, bottom, seed + 9, 1)
         for (const lane of LANES) {
-            const tick = isHalfLane(lane) ? 5 : 3
-            for (const x of [left, right]) roughLine(ctx, x - tick, this.sy(lane), x + tick, this.sy(lane), seed + lane * 3, 0.4, 1)
+            for (const x of [left, right]) roughLine(ctx, x - 5, this.sy(lane), x + 5, this.sy(lane), seed + lane * 3, 0.4, 1)
         }
         ctx.stroke()
 
@@ -532,12 +531,9 @@ export class Battlefield {
         for (const lane of LANES) {
             const rel = lane - caster.y
             const isZero = Math.abs(rel) < 1e-6
-            const half = isHalfLane(rel)
-            ctx.font = `700 ${half ? 17 : 13}px ${FONT_HAND}`
-            ctx.fillStyle = isZero ? INK.pen : withAlpha(INK.pen, half ? 0.55 : 0.4)
+            ctx.fillStyle = isZero ? INK.pen : withAlpha(INK.pen, 0.55)
             ctx.fillText(isZero ? "0" : fraction(rel), lx, this.sy(lane))
         }
-        ctx.font = `700 17px ${FONT_HAND}`
         ctx.textAlign = "center"
         ctx.textBaseline = "top"
         ctx.fillStyle = withAlpha(INK.pen, 0.6)
@@ -566,14 +562,14 @@ export class Battlefield {
         const { unit } = this.layout
         ctx.save()
         ctx.globalAlpha = 0.3
-        drawWizard(ctx, this.duel.wizards[side].character.look, x, this.sy(y), unit * 0.66, facing, { time: this.time, cast: 0, flash: 0, squash: 0, active: false })
+        drawWizard(ctx, this.duel.wizards[side].character.look, x, this.sy(y), unit * WIZARD_SIZE, facing, { time: this.time, cast: 0, flash: 0, squash: 0, active: false })
         ctx.globalAlpha = 0.75
         ctx.strokeStyle = INK.pencil
         ctx.lineWidth = 1.6
         ctx.setLineDash([4, 4])
         const from = this.sy(this.views[side].y)
         const to = this.sy(y)
-        const ax = x - facing * unit * 0.22
+        const ax = x - facing * unit * 0.7
         roughArrow(ctx, ax, from, ax, to + Math.sign(from - to) * 6, boilSeed(this.time, 6), 6)
         ctx.restore()
     }
@@ -584,7 +580,7 @@ export class Battlefield {
         for (const side of ["left", "right"] as const) {
             const v = this.views[side]
             const look = this.duel.wizards[side].character.look
-            drawWizard(this.ctx, look, this.sx(side === "left" ? 0 : 1), this.sy(v.y), unit * 0.66 * v.scale, side === "left" ? 1 : -1, {
+            drawWizard(this.ctx, look, this.sx(side === "left" ? 0 : 1), this.sy(v.y), unit * WIZARD_SIZE * v.scale, side === "left" ? 1 : -1, {
                 time: this.time,
                 cast: v.cast,
                 flash: v.flash,
@@ -962,4 +958,3 @@ function signed(v: number): string {
 }
 
 /** Handwritten-friendly numbers: ½ instead of 0.5. */
-const isHalfLane = (y: number) => Math.abs(y * 2 - Math.round(y * 2)) < 1e-6

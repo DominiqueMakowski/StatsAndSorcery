@@ -56,7 +56,7 @@ export const Characters: Record<string, Character> = {
         sloppiness: 0.4,
         // A dodger: hits and runs, and starts a lane off your line so turn one is already a choice.
         caution: 0.8,
-        startY: 0.25,
+        startY: 1,
         intro: "Harry never stands still. When he hops out of your lane, Move back in before you cast.",
         lesson: "The hatched band is where 95% of your Flames land. The further they fly, the wider it gets.",
     },
