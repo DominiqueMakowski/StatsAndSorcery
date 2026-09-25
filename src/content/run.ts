@@ -11,7 +11,7 @@ export interface RunStage {
 
 export const RUN_STAGES: RunStage[] = [
     // Bend the line: Lin's walls stop straight shots.
-    { enemy: "wendel", rewards: ["shift", "tilt", "arc"] },
+    { enemy: "plotter", rewards: ["shift", "tilt", "arc"] },
     // Trade precision for power: the Outlier doubles your spread.
     { enemy: "lin", rewards: ["focus", "frost_ray", "chain_lightning"] },
     { enemy: "outlier", rewards: [] },

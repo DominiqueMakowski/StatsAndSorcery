@@ -10,6 +10,7 @@ import { nextFrame } from "./render/tween"
 import { drawWizard } from "./render/wizard"
 import { createCard } from "./ui/cards"
 import { Coach } from "./ui/coach"
+import { RulesNote } from "./ui/rules"
 import { DuelView, type DuelSetupView, type DuelStats, type Mode } from "./ui/duelView"
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
@@ -24,6 +25,7 @@ let duelView: DuelView | null = null
 let lastSetup: DuelSetupView | null = null
 let run: RunState | null = null
 const coach = new Coach($("coach"))
+const rules = new RulesNote($("rules"))
 
 // ---------- Screens ----------
 
@@ -56,6 +58,7 @@ function startDuel(setup: DuelSetupView) {
                 toast: $("toast"),
             },
             coach,
+            rules,
             onDuelFinished
         )
     }
@@ -69,7 +72,7 @@ function showOverlay(html: string): HTMLElement {
 }
 
 function setupFor(mode: Mode): DuelSetupView {
-    if (mode === "pve") return { mode, left: Characters.apprentice, right: Characters.wendel }
+    if (mode === "pve") return { mode, left: Characters.apprentice, right: Characters.plotter }
     return {
         mode,
         left: { ...Characters.apprentice, name: "Player 1" },
@@ -198,7 +201,7 @@ function showRunVictory() {
     const el = showOverlay(`
         <div class="scroll scroll-final">
             <h1>Run complete!</h1>
-            <p>Wendel, Lin and the Outlier, all beaten.</p>
+            <p>Harry Plotter, Lin and the Outlier, all beaten.</p>
             ${statsBlock(s, "the whole run")}
             <p class="fine">Over many shots, "landed" drifts toward what "the odds said". That's the whole trick.</p>
             <div class="overlay-actions">
@@ -312,7 +315,7 @@ function startTitleScene() {
         ctx.restore()
 
         drawWizard(ctx, Characters.apprentice.look, lx, y + 4, h * 0.58, 1, { time, cast: 0.6 + Math.sin(time * 2) * 0.2, flash: 0, squash: 0, active: false })
-        drawWizard(ctx, Characters.wendel.look, rx, y + 4 + wiggle, h * 0.58, -1, { time, cast: 0, flash: 0, squash: 0, active: false })
+        drawWizard(ctx, Characters.plotter.look, rx, y + 4 + wiggle, h * 0.58, -1, { time, cast: 0, flash: 0, squash: 0, active: false })
         ctx.fillStyle = INK.pencil
         ctx.font = "700 16px 'Caveat', cursive"
         ctx.textAlign = "center"
@@ -351,6 +354,7 @@ muteBtn.onclick = () => {
 renderMute()
 
 $("quit-btn").onclick = showTitle
+$("rules-btn").onclick = () => duelView?.showRules()
 $("tips-reset").onclick = (e) => {
     e.preventDefault()
     coach.reset()

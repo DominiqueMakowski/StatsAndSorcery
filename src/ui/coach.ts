@@ -19,13 +19,7 @@ export class Coach {
 
     /** Show a tip once per key (persisted), or every time when `always` is set. */
     say(key: string, text: string, always = false) {
-        if (!always && this.seen.has(key)) return
-        this.seen.add(key)
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify([...this.seen]))
-        } catch {
-            // ignore
-        }
+        if (!always && !this.firstTime(key)) return
         this.textEl.innerHTML = text
         this.el.hidden = false
         this.el.classList.remove("is-in")
@@ -33,6 +27,18 @@ export class Coach {
         this.el.classList.add("is-in")
         clearTimeout(this.timer)
         this.timer = window.setTimeout(() => this.hide(), 11000)
+    }
+
+    /** True the first time a key comes up (persisted), then false until tips are reset. */
+    firstTime(key: string): boolean {
+        if (this.seen.has(key)) return false
+        this.seen.add(key)
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify([...this.seen]))
+        } catch {
+            // ignore
+        }
+        return true
     }
 
     hide() {

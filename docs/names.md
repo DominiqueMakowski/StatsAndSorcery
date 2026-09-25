@@ -6,7 +6,7 @@ Approved puns for future characters, items and places. Each one should allude to
 
 | Name | Pun on | Stats idea | Could be |
 |---|---|---|---|
-| **Harry Plotter** | Harry Potter | plots | the hero of a story mode, or a rival apprentice |
+| **Harry Plotter** | Harry Potter | plots | **in the game:** the first opponent, who dodges between lanes |
 | **Lord Voldemode** | Voldemort | the mode | a final boss with skewed spells, whose most likely landing spot isn't the average one |
 | **Tom Residdle** | Tom Riddle | residuals | young Voldemode; teaches that every miss is a residual, the gap between aim and landing |
 | **Nearly Normal Nick** | Nearly Headless Nick | approximately normal data | a ghostly guide, or an opponent whose spells are *almost* normal but with slightly heavier tails |

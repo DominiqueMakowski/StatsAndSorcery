@@ -27,7 +27,7 @@ Wards and hexes are opponent tricks for now (Lin's walls, the Outlier's Jinx).
 
 **Beyond lines.** Spells don't have to stay linear models. Future spells can draw on other statistical ideas, as long as each fits in one plain sentence and its odds stay exact. For example **Fire Rain**, an area-of-effect spell that falls at a point drawn from a Normal distribution with a given location and SD and hits everything within a radius: it teaches location vs. scale. Skewed, heavy-tailed or bimodal spells could follow. Where there's no closed form, estimate the hit chance by Monte Carlo with common random numbers, as `hitChance` in `shot.ts` already does with wards.
 
-**Funny names with a statistical twist.** Characters, items and places should ideally be puns on popular wizard references (Harry Potter, Tolkien, Merlin…) that allude to a stats concept, e.g. *Lord Voldemode*, *Tom Residdle*, *The Wizard of Odds*, *Logwarts School of Statcraft*. Keep them affectionate puns rather than the originals, and ideally let the name hint at what the opponent teaches. Draw from the approved list in [`docs/names.md`](docs/names.md), which also has story ideas (quest goals, items, places). The current names (Wobbly Wendel, Warden Lin) are placeholders; The Outlier is the right spirit.
+**Funny names with a statistical twist.** Characters, items and places should ideally be puns on popular wizard references (Harry Potter, Tolkien, Merlin…) that allude to a stats concept, e.g. *Lord Voldemode*, *Tom Residdle*, *The Wizard of Odds*, *Logwarts School of Statcraft*. Keep them affectionate puns rather than the originals, and ideally let the name hint at what the opponent teaches. Draw from the approved list in [`docs/names.md`](docs/names.md), which also has story ideas (quest goals, items, places). The first opponent is Harry Plotter; Warden Lin is still a placeholder, and The Outlier is the right spirit.
 
 **Parked ideas** (from the original brainstorm): items (e.g. a hat granting +1 ★), charge-to-cast alterations, character archetypes (spellcaster vs. archer), cosmetics that evolve with progress, skill trees, online play and classroom tournaments.
 
@@ -71,6 +71,7 @@ src/ui/        DOM
   cards.ts       card markup and the sketchy SVG mini-graph on each card
   hud.ts         name strips, hearts, stars, "jinxed" chip
   coach.ts       Professor Hoot's once-only sticky notes (persisted in localStorage)
+  rules.ts       the rules sticky note: shown before your first duel, reopened from "? rules"
 src/audio/sfx.ts  WebAudio synth; mute persisted in localStorage
 src/main.ts    screens: title, run intro → duel → reward → …, result scrolls, portraits, dev hooks
 src/styles/main.css  the whole notebook look; CSS variables at the top
@@ -87,7 +88,7 @@ src/styles/main.css  the whole notebook look; CSS variables at the top
 - Lanes are ½ apart and the hitbox is ±0.18, so a spread (σ at the target) around 0.1 is reliable and around 0.3 is a gamble. Aligned hit chances (internal, never shown while aiming): Flame 83%, Frost Ray ≈ 100% for 2 ★, Chain Lightning 54% for 2 damage. A jinxed Flame drops to 51%; a focused one rises to 99%.
 - Flame has a precise start (β₀ σ 0.01) but a wobbly angle (β₁ σ 0.13), so its band is a cone: ±0.02 at the staff, ±0.13 at mid-field, ±0.26 at the target. It's the first picture of "uncertainty grows with distance".
 - Apprentice: 5 HP, 2 ★, hand of 3, deck of 4 Flame + 3 Move. Each win gives +1 ♥ and one card from that stage's `rewards` in `run.ts`; full heal between duels.
-- One idea per opponent. Wendel (Flame + Move only, dodges) teaches reading the band. Lin (walls at mid-field) teaches slope vs. intercept: Tilt runs into a wall, Shift clears it, Arc lobs over when you're aligned (82% with Flame). The Outlier (Jinx doubles your spread) teaches variance: Focus, or a sure 1 over a risky 2.
+- One idea per opponent. Harry Plotter (Flame + Move only, dodges) teaches reading the band. Lin (walls at mid-field) teaches slope vs. intercept: Tilt runs into a wall, Shift clears it, Arc lobs over when you're aligned (82% with Flame). The Outlier (Jinx doubles your spread) teaches variance: Focus, or a sure 1 over a risky 2.
 - With 2 ★, a spell plus two alterations doesn't fit in one turn; that's why Arc is a single card.
 - Damage is an integer and Flame already deals the minimum, so "precise but weak" can only mean "precise but costly" (Frost Ray) for now. A finer HP/damage scale would open up that axis.
 
@@ -117,7 +118,7 @@ bun run build      # tsc && vite build → dist/ (relative base, works on GitHub
 ## Testing and debugging tips
 
 - Put rules and maths in `src/core` and cover them in `*.test.ts`; UI and rendering are verified by playing.
-- `?duel=wendel|lin|outlier` on the dev server jumps straight into a quick duel against that opponent.
+- `?duel=plotter|lin|outlier` on the dev server jumps straight into a quick duel against that opponent.
 - In dev, `window.__sas.duel` is the live `Duel` and `window.__sas.run` the run state. Modules can be imported in the browser console with `await import('/src/core/ai.ts')` to script turns (e.g. call `planTurn(duel, "left", 0, rng)` and click the matching `#hand .card[data-uid]`).
 - Tips are remembered in `localStorage` (`sas.tips`); use "show tips again" on the title page or clear the key.
 - If the canvas looks frozen in an embedded browser, check whether `requestAnimationFrame` is firing before suspecting the renderer; `nextFrame()` falls back to a 250 ms timer.

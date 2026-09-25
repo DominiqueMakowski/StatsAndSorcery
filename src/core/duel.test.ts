@@ -16,14 +16,14 @@ describe("duel rules", () => {
     test("every hand contains an attack", () => {
         const deck = ["shift", "shift", "tilt", "focus", "move", "move", "flame"]
         for (let seed = 0; seed < 50; seed++) {
-            const duel = new Duel({ left: withDeck(Characters.apprentice, deck), right: Characters.wendel, seed })
+            const duel = new Duel({ left: withDeck(Characters.apprentice, deck), right: Characters.plotter, seed })
             duel.start()
             expect(duel.active.hand.some((c) => getSpell(c.spellId).kind === "attack")).toBe(true)
         }
     })
 
     test("playing cards spends AP and rejects illegal plays", () => {
-        const duel = new Duel({ left: withDeck(Characters.apprentice, ["frost_ray", "shift", "move"]), right: Characters.wendel, seed: 1 })
+        const duel = new Duel({ left: withDeck(Characters.apprentice, ["frost_ray", "shift", "move"]), right: Characters.plotter, seed: 1 })
         duel.start()
         const byId = (id: string) => duel.active.hand.find((c) => c.spellId === id)!
         expect(duel.whyNot({ uid: byId("shift").uid })).toBe("Choose a direction")
@@ -34,7 +34,7 @@ describe("duel rules", () => {
 
     test("a precise shot at an aligned target deals damage and can end the duel", () => {
         const sniper = withDeck(Characters.apprentice, ["frost_ray", "frost_ray", "frost_ray"], { ap: 6 })
-        const duel = new Duel({ left: sniper, right: withDeck(Characters.wendel, ["flame"], { hp: 2 }), seed: 4 })
+        const duel = new Duel({ left: sniper, right: withDeck(Characters.plotter, ["flame"], { hp: 2 }), seed: 4 })
         duel.start()
         const events = duel.active.hand.slice(0, 2).flatMap((c) => duel.play({ uid: c.uid }))
         expect(events.filter((e) => e.type === "damage")).toHaveLength(2)
@@ -43,7 +43,7 @@ describe("duel rules", () => {
     })
 
     test("preview applies queued alterations and movement to the attack", () => {
-        const duel = new Duel({ left: withDeck(Characters.apprentice, ["flame", "shift", "move"], { ap: 3 }), right: Characters.wendel, seed: 2 })
+        const duel = new Duel({ left: withDeck(Characters.apprentice, ["flame", "shift", "move"], { ap: 3 }), right: Characters.plotter, seed: 2 })
         duel.start()
         duel.wizards.right.y = 0.5
         const card = (id: string) => duel.active.hand.find((c) => c.spellId === id)!.uid
@@ -72,7 +72,7 @@ describe("duel rules", () => {
 
 describe("AI", () => {
     test("a careful AI corrects its aim when the target is off-lane", () => {
-        const aimer = withDeck(Characters.wendel, ["flame", "shift", "move"], { sloppiness: 0 })
+        const aimer = withDeck(Characters.plotter, ["flame", "shift", "move"], { sloppiness: 0 })
         const duel = new Duel({ left: Characters.apprentice, right: aimer, seed: 5 })
         duel.start()
         duel.endTurn()

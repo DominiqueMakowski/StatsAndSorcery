@@ -14,6 +14,7 @@ import { wait } from "../render/tween"
 import { createCard, createCardBack } from "./cards"
 import type { Coach } from "./coach"
 import { renderPanel } from "./hud"
+import type { RulesNote } from "./rules"
 
 export type Mode = "pve" | "pvp"
 
@@ -61,12 +62,14 @@ export class DuelView {
         private bf: Battlefield,
         private els: Elements,
         private coach: Coach,
+        private rules: RulesNote,
         private onFinish: (winner: Side, setup: DuelSetupView, stats: DuelStats) => void
     ) {
         els.castBtn.onclick = () => this.cast()
         window.addEventListener("keydown", (e) => {
             if (!this.duel || !this.isHumanTurn || this.busy) return
             if (e.target instanceof HTMLElement && e.target.tagName === "INPUT") return
+            if (this.rules.isOpen && (e.key === "Enter" || e.key === "Escape")) return this.rules.hide()
             if (e.key === "Enter") return this.cast()
             if (e.key === "Escape") {
                 this.queue = []
@@ -96,9 +99,15 @@ export class DuelView {
         this.bf.setDuel(this.duel)
         this.coach.hide()
         const session = ++this.session
+        this.rules.hide()
         await this.run(this.duel.start())
         if (session !== this.session) return
         this.beginTurn()
+    }
+
+    /** Reopen the rules note (the "? rules" link). */
+    showRules() {
+        if (this.duel) this.rules.show(this.setup.mode === "pve" ? this.duel.wizards.left.character : this.duel.active.character)
     }
 
     /** The duel being played (read-only access for tooling). */
@@ -111,6 +120,7 @@ export class DuelView {
         this.session++
         this.busy = true
         this.coach.hide()
+        this.rules.hide()
         this.bf.setPreview([])
     }
 
@@ -175,7 +185,15 @@ export class DuelView {
         if (this.isHumanTurn) {
             this.stats.turns++
             this.refresh()
-            if (this.setup.mode === "pve") this.coachAtTurnStart()
+            if (this.stats.turns === 1 && this.coach.firstTime("rules")) {
+                // Hoot's first tip waits until the rules are out of the way (if the turn hasn't moved on).
+                const session = this.session
+                this.rules.show(this.duel.active.character, () => {
+                    if (session === this.session && this.stats.turns === 1 && !this.busy) this.coachAtTurnStart()
+                })
+            } else {
+                this.coachAtTurnStart()
+            }
         } else {
             this.runAi()
         }
@@ -270,6 +288,7 @@ export class DuelView {
     // ---------- Coaching ----------
 
     private coachAtTurnStart() {
+        if (this.setup.mode !== "pve") return
         const me = this.duel.active
         const foe = this.duel.wizards[other(me.side)]
         const hand = me.hand.map((c) => getSpell(c.spellId))
@@ -277,7 +296,7 @@ export class DuelView {
         const wallAhead = this.duel.wards.some((w) => w.owner !== me.side && toLocalX(me.side, w.x) > 0 && toLocalX(me.side, w.x) < 1)
 
         if (this.stats.turns === 1) {
-            this.coach.say("first", "Hoot! Click a card to plan it. The <b>hatched band</b> is where 95% of casts land. Keep your target inside it.")
+            this.coach.say("first", "Hoot! The <b>hatched band</b> is where 95% of your casts land. Keep your target inside it.")
             return
         }
         if (me.turnSdScale > 1) {

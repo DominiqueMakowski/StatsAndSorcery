@@ -40,17 +40,17 @@ export const Characters: Record<string, Character> = {
         look: { ink: "#1e2a5a", tint: "#5b8def", accent: "#f2c230", hat: "pointed", extra: "scarf" },
         sloppiness: 0,
     },
-    wendel: {
-        id: "wendel",
-        name: "Wobbly Wendel",
-        title: "Hedge Wizard",
+    plotter: {
+        id: "plotter",
+        name: "Harry Plotter",
+        title: "The Boy Who Plotted",
         hp: 3,
         ap: 2,
         handSize: 3,
         deck: ["flame", "flame", "flame", "move", "move", "move"],
-        look: { ink: "#2b2b2b", tint: "#b47ee8", accent: "#7bd389", hat: "wide", extra: "beard" },
+        look: { ink: "#2b2b2b", tint: "#b47ee8", accent: "#7bd389", hat: "wide", extra: "glasses" },
         sloppiness: 0.6,
-        intro: "Wendel never stands still. When he hops out of your lane, Move back in before you cast.",
+        intro: "Harry never stands still. When he hops out of your lane, Move back in before you cast.",
         lesson: "The hatched band is where 95% of your Flames land. The further they fly, the wider it gets.",
     },
     lin: {

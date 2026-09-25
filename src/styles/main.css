@@ -258,7 +258,8 @@ b {
     animation: rise 0.7s 0.4s var(--ease-out) both;
 }
 
-.sticky::before {
+.sticky::before,
+.rules-note::before {
     /* A strip of tape */
     content: "";
     position: absolute;
@@ -559,6 +560,65 @@ b {
     background: none;
     border: none;
     cursor: pointer;
+}
+
+/* ---------- Rules (a big sticky note before your first duel) ---------- */
+
+.rules-note {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: min(460px, calc(100% - 32px));
+    padding: 14px 22px 14px;
+    background: var(--sticky);
+    box-shadow: 2px 4px 10px rgba(80, 60, 20, 0.2);
+    transform: translate(-50%, -50%) rotate(1.2deg);
+    font: 17px/1.3 var(--font-ui);
+    color: #3a3320;
+    z-index: 4;
+}
+
+.rules-note.is-in {
+    animation: rules-in 0.45s var(--ease-spring);
+}
+
+@keyframes rules-in {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -40%) rotate(5deg);
+    }
+}
+
+.rules-note h2 {
+    margin: 0 0 6px;
+    font: 26px var(--font-marker);
+    color: var(--ink);
+}
+
+.rules-list {
+    margin: 0 0 10px;
+    padding-left: 22px;
+}
+
+.rules-list li {
+    margin-bottom: 5px;
+}
+
+.rules-list li::marker {
+    color: var(--red);
+    font-weight: 700;
+}
+
+.rules-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.rules-keys {
+    font: 700 16px var(--font-hand);
+    color: var(--pencil);
 }
 
 /* ---------- Tray & cards ---------- */

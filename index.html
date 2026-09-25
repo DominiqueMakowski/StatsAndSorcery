@@ -59,6 +59,14 @@
                         <p class="coach-text"></p>
                         <button class="coach-close" aria-label="Dismiss tip">×</button>
                     </div>
+                    <aside class="rules-note" id="rules" aria-label="Rules" hidden>
+                        <h2>rules</h2>
+                        <ol class="rules-list"></ol>
+                        <div class="rules-foot">
+                            <span class="rules-keys">keys: 1 2 3 pick · Enter casts · Esc clears</span>
+                            <button class="btn btn-primary rules-ok">Got it!</button>
+                        </div>
+                    </aside>
                 </main>
                 <footer class="tray">
                     <div class="hand" id="hand"></div>
@@ -68,6 +76,7 @@
                     </div>
                 </footer>
                 <div class="corner-actions">
+                    <button class="link-btn" id="rules-btn">? rules</button>
                     <button class="link-btn" id="mute-btn">♪ sound on</button>
                     <button class="link-btn" id="quit-btn">✕ quit</button>
                 </div>
