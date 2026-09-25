@@ -22,6 +22,33 @@ export function normalIntervalProb(dist: Normal, lo: number, hi: number): number
     return normalCdf((hi - dist.mean) / dist.sd) - normalCdf((lo - dist.mean) / dist.sd)
 }
 
+/**
+ * Where a height ends up after bouncing between mirrors at ±m: a triangle wave, identity on [−m, m].
+ * Heights past a mirror come back reflected (y ↦ 2m − y), and so on for multiple bounces.
+ */
+export function reflectBetween(y: number, m: number): number {
+    const u = (((y + m) % (4 * m)) + 4 * m) % (4 * m)
+    return u <= 2 * m ? u - m : 3 * m - u
+}
+
+/**
+ * P(lo ≤ reflect(X) ≤ hi) for X ~ N(mean, sd) bouncing between mirrors at ±m: a folded normal.
+ * The interval has a copy in every mirror image of the field, so we add the normal's mass over
+ * each copy (it repeats every 4m, flipped every other 2m). Three images each way is plenty.
+ */
+export function foldedIntervalProb(dist: Normal, lo: number, hi: number, m: number): number {
+    lo = Math.max(lo, -m)
+    hi = Math.min(hi, m)
+    if (hi <= lo) return 0
+    let p = 0
+    for (let k = -3; k <= 3; k++) {
+        const shift = 4 * m * k
+        p += normalIntervalProb(dist, lo + shift, hi + shift)
+        p += normalIntervalProb(dist, 2 * m - hi + shift, 2 * m - lo + shift)
+    }
+    return p
+}
+
 export function ci95(dist: Normal): [number, number] {
     return [dist.mean - Z95 * dist.sd, dist.mean + Z95 * dist.sd]
 }

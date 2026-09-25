@@ -4,7 +4,7 @@ export type Side = "left" | "right"
 export type Direction = 1 | -1
 export type Element = "fire" | "frost" | "storm" | "arcane" | "nature" | "shadow"
 
-interface SpellBase {
+interface ActionBase {
     id: string
     name: string
     /** Short statistical label shown on the card, e.g. "β₀". */
@@ -12,33 +12,33 @@ interface SpellBase {
     cost: number
     element: Element
     description: string
-    /** Spells only opponents can use (never offered to the player). */
+    /** Actions only opponents can use (never offered to the player). */
     enemyOnly?: boolean
 }
 
-export interface AttackSpell extends SpellBase {
-    kind: "attack"
+export interface SpellAction extends ActionBase {
+    kind: "spell"
     beta0: Normal
     beta1: Normal
     damage: number
     visual: "projectile" | "ray" | "bolt"
 }
 
-/** Alters the parameters of the caster's next attack this turn. Directional ones ask for up/down. */
-export interface AlterationSpell extends SpellBase {
+/** Alters the parameters of the caster's next spell this turn. Directional ones ask for up/down. */
+export interface AlterationAction extends ActionBase {
     kind: "alteration"
     dBeta0?: number
     dBeta1?: number
     sdScale?: number
 }
 
-export interface MoveSpell extends SpellBase {
-    kind: "move"
+export interface MovementAction extends ActionBase {
+    kind: "movement"
     step: number
 }
 
 /** Places a barrier between the wizards that absorbs one incoming shot. */
-export interface WardSpell extends SpellBase {
+export interface WardAction extends ActionBase {
     kind: "ward"
     /** Distance from the owner, in field units (0–1). */
     distance: number
@@ -46,27 +46,27 @@ export interface WardSpell extends SpellBase {
 }
 
 /** Scales the opponent's spread during their next turn. */
-export interface HexSpell extends SpellBase {
+export interface HexAction extends ActionBase {
     kind: "hex"
     sdScale: number
 }
 
 /**
- * Every card. Players see three categories: spells (attack), actions (move) and alterations.
- * Wards and hexes are opponent tricks for now.
+ * Every card is an action: it costs action points and has a type (its `kind`). Players have
+ * spells, movements and alterations; wards and hexes are opponent tricks for now.
  */
-export type Spell = AttackSpell | AlterationSpell | MoveSpell | WardSpell | HexSpell
+export type Action = SpellAction | AlterationAction | MovementAction | WardAction | HexAction
 
-export function isDirectional(spell: Spell): boolean {
-    return spell.kind === "move" || (spell.kind === "alteration" && (spell.dBeta0 !== undefined || spell.dBeta1 !== undefined))
+export function isDirectional(action: Action): boolean {
+    return action.kind === "movement" || (action.kind === "alteration" && (action.dBeta0 !== undefined || action.dBeta1 !== undefined))
 }
 
 export interface Card {
     uid: number
-    spellId: string
+    actionId: string
 }
 
-/** One card played from the hand, with a direction when the spell needs one. */
+/** One card played from the hand, with a direction when the action needs one. */
 export interface Play {
     uid: number
     dir?: Direction
@@ -99,11 +99,11 @@ export interface CastResult {
 
 export type DuelEvent =
     | { type: "turnStart"; side: Side; turn: number }
-    | { type: "alteration"; side: Side; spellId: string; mods: AttackMods }
-    | { type: "move"; side: Side; spellId: string; from: number; to: number }
-    | { type: "ward"; side: Side; spellId: string; ward: Ward }
+    | { type: "alteration"; side: Side; actionId: string; mods: AttackMods }
+    | { type: "move"; side: Side; actionId: string; from: number; to: number }
+    | { type: "ward"; side: Side; actionId: string; ward: Ward }
     | { type: "wardExpired"; wardId: number }
-    | { type: "hex"; side: Side; spellId: string; target: Side; sdScale: number }
-    | ({ type: "cast"; side: Side; spellId: string } & CastResult)
+    | { type: "hex"; side: Side; actionId: string; target: Side; sdScale: number }
+    | ({ type: "cast"; side: Side; actionId: string } & CastResult)
     | { type: "damage"; side: Side; amount: number; hp: number }
     | { type: "gameOver"; winner: Side }

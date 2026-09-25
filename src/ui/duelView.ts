@@ -2,7 +2,7 @@
 
 import { sfx } from "../audio/sfx"
 import type { Character } from "../content/characters"
-import { getSpell } from "../content/spells"
+import { getAction } from "../content/actions"
 import { planTurn } from "../core/ai"
 import { Duel, other, previewPlan } from "../core/duel"
 import { createRng, randomSeed } from "../core/rng"
@@ -42,7 +42,12 @@ interface Elements {
     toast: HTMLElement
 }
 
+// Number keys still pick cards (and Enter/Esc cast/clear), but the game is designed for the mouse.
 const HOTKEYS = ["1", "2", "3", "4", "5", "6"]
+
+// Planning shows no band or path: players infer where a spell will go from its card and the axes, then
+// see the true band when it flies (AGENTS.md, "Learning mechanism"). `?aim` brings the preview back.
+const SHOW_AIM = new URLSearchParams(location.search).has("aim")
 
 export class DuelView {
     private duel!: Duel
@@ -80,8 +85,8 @@ export class DuelView {
             if (index >= 0) {
                 const card = this.duel.active.hand[index]
                 if (!card) return
-                const spell = getSpell(card.spellId)
-                this.toggle(card.uid, isDirectional(spell) ? (e.shiftKey ? -1 : 1) : undefined)
+                const action = getAction(card.actionId)
+                this.toggle(card.uid, isDirectional(action) ? (e.shiftKey ? -1 : 1) : undefined)
             }
         })
     }
@@ -169,7 +174,7 @@ export class DuelView {
     private recordShot(event: Extract<DuelEvent, { type: "cast" }>) {
         this.stats.shots++
         if (event.outcome === "hit") this.stats.hits++
-        this.stats.expectedHits += this.castChances.get(event.spellId + ":" + this.stats.shots) ?? 0
+        this.stats.expectedHits += this.castChances.get(event.actionId + ":" + this.stats.shots) ?? 0
         const impact = event.sample.beta0 + event.sample.beta1
         const [lo, hi] = ci95(heightAt(event.line, 1))
         if (impact < lo || impact > hi) this.stats.outliers++
@@ -215,7 +220,7 @@ export class DuelView {
 
         // Remember what the odds said, in the order shots will be fired.
         let shotIndex = this.stats.shots
-        for (const attack of plan?.attacks ?? []) this.castChances.set(attack.spellId + ":" + ++shotIndex, attack.hitChance)
+        for (const attack of plan?.attacks ?? []) this.castChances.set(attack.actionId + ":" + ++shotIndex, attack.hitChance)
 
         for (const play of plays) {
             // Pull the card out of the tray as it resolves.
@@ -251,16 +256,16 @@ export class DuelView {
         const plan = planTurn(this.duel, side, this.duel.wizards[side].character.sloppiness, this.aiRng)
         for (const play of plan) {
             const card = this.duel.wizards[side].hand.find((c) => c.uid === play.uid)!
-            const spell = getSpell(card.spellId)
+            const action = getAction(card.actionId)
             const back = this.els.hand.firstElementChild
-            const revealed = createCard(spell, { affordable: true })
+            const revealed = createCard(action, { affordable: true })
             revealed.classList.add("is-revealed")
             if (back) this.els.hand.replaceChild(revealed, back)
             sfx.play("pop")
-            // Show the aim they chose before they commit to it.
+            // Show that they're taking aim (and, with ?aim, the band they chose) before they commit.
             const preview = previewPlan(this.duel, side, [play])
-            if (preview?.attacks.length) this.bf.setPreview(preview.attacks)
-            await wait(spell.kind === "attack" ? 900 : 550)
+            if (preview?.attacks.length) this.bf.setPreview(SHOW_AIM ? preview.attacks : [], [], null, true)
+            await wait(action.kind === "spell" ? 900 : 550)
             if (session !== this.session) return
             this.bf.setPreview([])
             revealed.remove()
@@ -291,34 +296,38 @@ export class DuelView {
         if (this.setup.mode !== "pve") return
         const me = this.duel.active
         const foe = this.duel.wizards[other(me.side)]
-        const hand = me.hand.map((c) => getSpell(c.spellId))
+        const hand = me.hand.map((c) => getAction(c.actionId))
         const has = (id: string) => hand.some((s) => s.id === id)
         const wallAhead = this.duel.wards.some((w) => w.owner !== me.side && toLocalX(me.side, w.x) > 0 && toLocalX(me.side, w.x) < 1)
 
         if (this.stats.turns === 1) {
-            this.coach.say("first", "Hoot! The <b>hatched band</b> is where 95% of your casts land. Keep your target inside it.")
+            this.coach.say("first", "Hoot! Guess where your Flame will land, then cast. The <b>hatched band</b> that flashes up shows where 95% of casts go.")
             return
         }
         if (me.turnSdScale > 1) {
-            this.coach.say("jinxed", "You're <b>jinxed</b>: your spread is doubled this turn. <b>Focus</b> halves it back.")
+            this.coach.say("jinxed", "You're <b>jinxed</b>: your standard deviation is doubled this turn. <b>SD ÷ 2</b> halves it back.")
             return
         }
         if (wallAhead) {
-            this.coach.say("wall", "A wall at mid-field! <b>Tilt</b> swings your line into it; <b>Shift</b> and <b>Arc</b> go over it.")
+            this.coach.say("wall", "A wall at mid-field! Changing the <b>slope</b> swings your line into it; raising the <b>intercept</b> goes over it.")
             return
         }
         if (foe.y !== me.y) {
-            if (has("shift") || has("tilt")) this.coach.say("offlane", "They moved off your line. <b>Shift (β₀)</b> lifts the whole line; <b>Tilt (β₁)</b> angles it.")
-            else if (has("move")) this.coach.say("chase", "They stepped out of your lane. <b>Move</b> back in, then cast.")
+            if (has("intercept") || has("slope")) this.coach.say("offlane", "They're off your line. The <b>intercept (β₀)</b> lifts the whole line; the <b>slope (β₁)</b> angles it.")
+            else if (has("move")) this.coach.say("chase", "They're off your line. Shoot anyway, or <b>Move</b> to line up first?")
             return
         }
-        if (has("focus") && hand.some((s) => s.kind === "attack" && s.id !== "frost_ray")) {
-            this.coach.say("focus", "<b>Focus</b> halves the spread of your next spell: a narrower band, fewer misses.")
+        if (has("move") && hand.some((s) => s.kind === "spell")) {
+            this.coach.say("hitrun", "You're in each other's line of fire. Try casting, <b>then Moving</b> away: they'll have to chase you.")
+            return
+        }
+        if (has("halve_sd") && hand.some((s) => s.kind === "spell" && s.id !== "frost_ray")) {
+            this.coach.say("halve_sd", "<b>SD ÷ 2</b> halves your next spell's standard deviation: a narrower band, fewer misses.")
         }
     }
 
     private coachAfterShot(event: Extract<DuelEvent, { type: "cast" }>) {
-        const chance = this.castChances.get(event.spellId + ":" + this.stats.shots) ?? 0
+        const chance = this.castChances.get(event.actionId + ":" + this.stats.shots) ?? 0
         if (event.outcome === "miss" && chance >= 0.85) {
             this.coach.say("variance", `Missed at ${Math.round(chance * 100)}%? That's variance: it still misses ${Math.round((1 - chance) * 100)} times in 100.`)
         } else if (event.outcome === "hit" && chance <= 0.3) {
@@ -343,12 +352,12 @@ export class DuelView {
         } else {
             const card = this.duel.active.hand.find((c) => c.uid === uid)
             if (!card) return
-            const spell = getSpell(card.spellId)
-            if (isDirectional(spell) && !dir) return
+            const action = getAction(card.actionId)
+            if (isDirectional(action) && !dir) return
             const candidate = this.withPlay(dir ? { uid, dir } : { uid })
             if (!previewPlan(this.duel, this.duel.turn, candidate)) {
                 const apLeft = previewPlan(this.duel, this.duel.turn, this.queue)?.apLeft ?? 0
-                this.toast(spell.cost > apLeft ? "Not enough ★ this turn" : spell.kind === "move" ? "Can't move that way" : "Can't do that")
+                this.toast(action.cost > apLeft ? "Not enough ★ this turn" : action.kind === "movement" ? "Can't move that way" : "Can't do that")
                 return
             }
             this.queue = candidate
@@ -359,13 +368,14 @@ export class DuelView {
     }
 
     /**
-     * The queue with a new play added. Alterations and moves slot in before a trailing
-     * attack, so "Flame, then Shift" means "shift the Flame".
+     * The queue with a new play added. Alterations slot in before a trailing spell, so "Flame,
+     * then Intercept" raises the Flame's intercept. Everything else keeps the order you picked: "Flame,
+     * then Move" is a hit and run.
      */
     private withPlay(play: Play): Play[] {
-        const spellOf = (p: Play) => getSpell(this.duel.active.hand.find((c) => c.uid === p.uid)!.spellId)
+        const actionOf = (p: Play) => getAction(this.duel.active.hand.find((c) => c.uid === p.uid)!.actionId)
         const last = this.queue.at(-1)
-        if (last && spellOf(play).kind !== "attack" && spellOf(last).kind === "attack") {
+        if (last && actionOf(play).kind === "alteration" && actionOf(last).kind === "spell") {
             return [...this.queue.slice(0, -1), play, last]
         }
         return [...this.queue, play]
@@ -386,16 +396,21 @@ export class DuelView {
 
     private updatePreview() {
         const side = this.duel.turn
-        const committed = previewPlan(this.duel, side, this.queue)?.attacks ?? []
-        const ghost = this.hover && !this.queue.some((p) => p.uid === this.hover!.uid) ? previewPlan(this.duel, side, this.withPlay(this.hover))?.attacks : null
-        if (!ghost) return this.bf.setPreview(committed)
-        // A hovered attack adds a new ghost line; a hovered alteration or move re-aims the queued attack.
-        if (ghost.length > committed.length) this.bf.setPreview(committed, ghost.slice(committed.length))
-        else this.bf.setPreview([], ghost)
+        const plan = previewPlan(this.duel, side, this.queue)
+        const committed = plan?.attacks ?? []
+        const hovered = this.hover && !this.queue.some((p) => p.uid === this.hover!.uid) ? previewPlan(this.duel, side, this.withPlay(this.hover)) : null
+        const finalY = (hovered ?? plan)?.finalY ?? this.duel.active.y
+        const landing = finalY === this.duel.active.y ? null : finalY
+        const ghost = hovered?.attacks
+        if (!SHOW_AIM) return this.bf.setPreview([], [], landing, committed.length + (ghost?.length ?? 0) > 0)
+        if (!ghost) return this.bf.setPreview(committed, [], landing)
+        // A hovered spell adds a new ghost line; a hovered alteration or move before a spell re-aims it.
+        if (ghost.length > committed.length) this.bf.setPreview(committed, ghost.slice(committed.length), landing)
+        else this.bf.setPreview([], ghost, landing)
     }
 
     private queuedCost() {
-        return this.queue.reduce((sum, p) => sum + getSpell(this.duel.active.hand.find((c) => c.uid === p.uid)!.spellId).cost, 0)
+        return this.queue.reduce((sum, p) => sum + getAction(this.duel.active.hand.find((c) => c.uid === p.uid)!.actionId).cost, 0)
     }
 
     private renderHand() {
@@ -407,16 +422,15 @@ export class DuelView {
         const apLeft = plan?.apLeft ?? 0
         const y = plan?.finalY ?? this.duel.active.y
 
-        this.duel.active.hand.forEach((card, i) => {
-            const spell = getSpell(card.spellId)
+        this.duel.active.hand.forEach((card) => {
+            const action = getAction(card.actionId)
             const order = this.queue.findIndex((p) => p.uid === card.uid) + 1
-            const el = createCard(spell, {
+            const el = createCard(action, {
                 order: order || undefined,
-                affordable: spell.cost <= apLeft,
-                hotkey: HOTKEYS[i],
-                dirs: isDirectional(spell)
-                    ? spell.kind === "move"
-                        ? { up: y + spell.step <= FIELD.yMax, down: y - spell.step >= FIELD.yMin }
+                affordable: action.cost <= apLeft,
+                dirs: isDirectional(action)
+                    ? action.kind === "movement"
+                        ? { up: y + action.step <= FIELD.yMax, down: y - action.step >= FIELD.yMin }
                         : { up: true, down: true }
                     : undefined,
                 onPlay: (dir) => this.toggle(card.uid, dir),
@@ -451,9 +465,7 @@ export class DuelView {
         if (this.duel.winner) hint = ""
         else if (!this.isHumanTurn) hint = `${this.duel.active.character.name} is thinking…`
         else if (this.busy) hint = "casting…"
-        else if (this.queue.length === 0) hint = "click cards to plan your turn (or press 1, 2, 3)"
         else if (previewPlan(this.duel, this.duel.turn, this.queue)?.danglingMods) hint = "alterations need a spell after them, or they're wasted"
-        else hint = "Enter to cast · Esc to clear"
         this.els.hint.textContent = hint
     }
 

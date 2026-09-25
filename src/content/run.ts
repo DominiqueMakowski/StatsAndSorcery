@@ -10,11 +10,11 @@ export interface RunStage {
 }
 
 export const RUN_STAGES: RunStage[] = [
-    // Bend the line: Lin's walls stop straight shots.
-    { enemy: "plotter", rewards: ["shift", "tilt", "arc"] },
-    // Trade precision for power: the Outlier doubles your spread.
-    { enemy: "lin", rewards: ["focus", "frost_ray", "chain_lightning"] },
-    { enemy: "outlier", rewards: [] },
+    // Intercept or slope: Draco's walls stop straight shots.
+    { enemy: "plotter", rewards: ["intercept", "slope"] },
+    // Trade precision for power: Voldemode doubles your spread.
+    { enemy: "malfit", rewards: ["halve_sd", "frost_ray", "chain_lightning"] },
+    { enemy: "voldemode", rewards: [] },
 ]
 
 /** Extra health the apprentice gains after each victory. */

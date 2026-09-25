@@ -7,11 +7,11 @@ Approved puns for future characters, items and places. Each one should allude to
 | Name | Pun on | Stats idea | Could be |
 |---|---|---|---|
 | **Harry Plotter** | Harry Potter | plots | **in the game:** the first opponent, who dodges between lanes |
-| **Lord Voldemode** | Voldemort | the mode | a final boss with skewed spells, whose most likely landing spot isn't the average one |
+| **Lord Voldemode** | Voldemort | the mode | **in the game:** the boss, *He-Who-Must-Not-Be-Normalised*, with wide lightning and Jinxes. Later: skewed spells whose most likely landing spot (the mode) isn't the average |
 | **Tom Residdle** | Tom Riddle | residuals | young Voldemode; teaches that every miss is a residual, the gap between aim and landing |
 | **Nearly Normal Nick** | Nearly Headless Nick | approximately normal data | a ghostly guide, or an opponent whose spells are *almost* normal but with slightly heavier tails |
 | **Fleur Delacurve** | Fleur Delacour | curves | introduces the curvature alteration (a β₂·x² term) |
-| **Draco Malfit** | Draco Malfoy | a badly fitted model | a biased rival: a tight band in the wrong place (bias vs. variance) |
+| **Draco Malfit** | Draco Malfoy | a badly fitted model | **in the game:** the second opponent, whose walls teach intercept vs. slope. Later: a biased rival, a tight band in the wrong place (bias vs. variance) |
 | **Sarumean** | Saruman | the mean | an opponent who aims at your average lane, so predictable players get punished |
 | **Morgan le Fit** | Morgan le Fay | model fit | an enchantress whose spells follow your movement pattern (goodness of fit) |
 | **The Wizard of Odds** | The Wizard of Oz | odds | the examiner behind the curtain who reveals the true odds after each duel |

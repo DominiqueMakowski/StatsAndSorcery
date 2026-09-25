@@ -1,18 +1,16 @@
 // Cards are index cards taped to the desk: a name in marker, a little pen sketch of what
-// the spell does to a line, and a scribbled description.
+// the action does to a line, and a scribbled description.
 
 import { attackLine } from "../core/shot"
 import { heightAt, Z95 } from "../core/stats"
-import type { Direction, Spell } from "../core/types"
-import { jitter } from "../render/sketch"
+import type { Direction, Action } from "../core/types"
+import { fraction, jitter } from "../render/sketch"
 
 export interface CardOptions {
     order?: number
     affordable: boolean
     /** Which directions are currently allowed (directional spells only). */
     dirs?: { up: boolean; down: boolean }
-    /** Keyboard shortcut shown in the corner. */
-    hotkey?: string
     onPlay?: (dir?: Direction) => void
     onHover?: (dir: Direction | undefined | null) => void
 }
@@ -107,13 +105,13 @@ const target = (x: number, y: number, seed: number) =>
         1.8
     )
 
-/** A tiny pen sketch of what the spell does to a line. */
-export function spellGraph(spell: Spell): string {
-    const seed = hashId(spell.id)
+/** A tiny pen sketch of what the action does to a line. */
+export function actionGraph(action: Action): string {
+    const seed = hashId(action.id)
     let body = ""
-    switch (spell.kind) {
-        case "attack": {
-            const line = attackLine(spell)
+    switch (action.kind) {
+        case "spell": {
+            const line = attackLine(action)
             body = band(
                 (x) => heightAt(line, x).mean,
                 (x) => Z95 * heightAt(line, x).sd,
@@ -131,7 +129,7 @@ export function spellGraph(spell: Spell): string {
             break
         }
         case "alteration":
-            if (spell.dBeta0 && spell.dBeta1) {
+            if (action.dBeta0 && action.dBeta1) {
                 // Arc: up, then down, over a wall.
                 body = `<rect x="${gx(0.5) - 3}" y="${gy(0.32)}" width="6" height="${gy(-0.32) - gy(0.32)}" rx="1.5" fill="#7a7a7a" fill-opacity="0.5"/>`
                 body += penLine(
@@ -152,8 +150,8 @@ export function spellGraph(spell: Spell): string {
                     2
                 )
                 body += target(1, 0, seed + 7)
-            } else if (spell.dBeta0) {
-                const d = spell.dBeta0 * 1.4
+            } else if (action.dBeta0) {
+                const d = action.dBeta0 * 1.4
                 body = penLine(
                     [
                         [0, -0.3],
@@ -172,7 +170,7 @@ export function spellGraph(spell: Spell): string {
                     2
                 )
                 body += arrow(0.12, -0.25, -0.3 + d - 0.06, seed + 7)
-            } else if (spell.dBeta1) {
+            } else if (action.dBeta1) {
                 body = penLine(
                     [
                         [0, -0.3],
@@ -213,8 +211,8 @@ export function spellGraph(spell: Spell): string {
                 )
             }
             break
-        case "move": {
-            const to = spell.step >= 1 ? 0.9 : 0.5
+        case "movement": {
+            const to = action.step >= 1 ? 0.9 : 0.5
             body = `<circle cx="${gx(0.25)}" cy="${gy(-0.45)}" r="4.5" fill="none" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="2 2"/>`
             body += `<circle cx="${gx(0.25)}" cy="${gy(to)}" r="5" fill="currentColor" fill-opacity="0.25" stroke="currentColor" stroke-width="1.6"/>`
             body += arrow(0.25, -0.3, to - 0.24, seed + 8)
@@ -270,38 +268,39 @@ function hashId(id: string): number {
     return h
 }
 
-function statsLine(spell: Spell): string {
-    if (spell.kind !== "attack") return ""
-    const h = heightAt(attackLine(spell), 1)
-    return `<div class="card-stats"><span>95% band <b>±${(Z95 * h.sd).toFixed(2)}</b></span><span>dmg <b>${spell.damage}</b></span></div>`
+function statsLine(action: Action): string {
+    if (action.kind !== "spell") return ""
+    const h = heightAt(attackLine(action), 1)
+    return `<div class="card-stats"><span>95% band <b>±${(Z95 * h.sd).toFixed(2)}</b></span><span>dmg <b>${action.damage}</b></span></div>`
 }
 
-export function createCard(spell: Spell, opts: CardOptions): HTMLElement {
+export function createCard(action: Action, opts: CardOptions): HTMLElement {
     const el = document.createElement("div")
     el.className = "card"
-    el.style.setProperty("--el", `var(--${spell.element})`)
-    el.style.setProperty("--tilt", `${(jitter(hashId(spell.id) + (opts.order ?? 0), 3) * 2.2).toFixed(2)}deg`)
-    if (spell.name.length > 10) el.classList.add("has-long-name")
+    el.style.setProperty("--el", `var(--${action.element})`)
+    el.style.setProperty("--tilt", `${(jitter(hashId(action.id) + (opts.order ?? 0), 3) * 2.2).toFixed(2)}deg`)
+    if (action.name.length > 10) el.classList.add("has-long-name")
     if (opts.order) el.classList.add("is-queued")
     if (!opts.affordable && !opts.order) el.classList.add("is-unaffordable")
     el.setAttribute("role", "button")
-    el.setAttribute("aria-label", `${spell.name}, cost ${spell.cost}. ${spell.description}`)
+    el.setAttribute("aria-label", `${action.name} (${action.kind}), ${action.cost} action point${action.cost === 1 ? "" : "s"}. ${action.description}`)
 
     el.innerHTML = `
-        <span class="card-tape"></span>
-        <div class="card-cost" title="Action points">${spell.cost}</div>
+        <span class="card-tape">${action.kind}</span>
+        <div class="card-cost" title="Action points">${action.cost}</div>
         ${opts.order ? `<div class="card-order">${opts.order}</div>` : ""}
-        ${opts.hotkey && !opts.order ? `<div class="card-key">${opts.hotkey}</div>` : ""}
         <div class="card-head">
-            <span class="card-name">${spell.name}</span>
-            ${spell.symbol ? `<span class="card-symbol">${spell.symbol}</span>` : ""}
+            <span class="card-name">${action.name}</span>
+            ${action.symbol ? `<span class="card-symbol">${action.symbol}</span>` : ""}
         </div>
-        ${spellGraph(spell)}
-        <div class="card-desc">${spell.description}</div>
-        ${statsLine(spell)}
+        ${actionGraph(action)}
+        <div class="card-desc">${action.description}</div>
+        ${statsLine(action)}
     `
 
     if (opts.dirs && !opts.order) {
+        // An alteration of one parameter labels its buttons with the change itself (+½, −½).
+        const step = action.kind === "alteration" && (action.dBeta0 === undefined) !== (action.dBeta1 === undefined) ? (action.dBeta0 ?? action.dBeta1)! : null
         const dirs = document.createElement("div")
         dirs.className = "card-dirs"
         for (const [dir, label, allowed] of [
@@ -310,7 +309,7 @@ export function createCard(spell: Spell, opts: CardOptions): HTMLElement {
         ] as const) {
             const b = document.createElement("button")
             b.className = "card-dir"
-            b.innerHTML = `<span>${label}</span><small>${dir > 0 ? "up" : "down"}</small>`
+            b.innerHTML = `<span>${label}</span><small>${step !== null ? fraction(dir * step) : dir > 0 ? "up" : "down"}</small>`
             b.disabled = !allowed || !opts.affordable
             b.onclick = (e) => {
                 e.stopPropagation()

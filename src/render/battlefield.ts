@@ -2,17 +2,17 @@
 // bands, doodled wizards, comic-burst hits and margin scribbles.
 
 import { sfx } from "../audio/sfx"
-import { getSpell } from "../content/spells"
+import { getAction } from "../content/actions"
 import type { Duel, AttackPreview } from "../core/duel"
-import { FIELD, LANES, toWorldX } from "../core/shot"
+import { bouncePoints, FIELD, LANES, reflect, toWorldX } from "../core/shot"
 import { heightAt, Z95, type LineDistribution } from "../core/stats"
-import type { AttackSpell, CastResult, DuelEvent, Element, Side, Ward } from "../core/types"
+import type { SpellAction, CastResult, DuelEvent, Element, Side, Ward } from "../core/types"
 import { Particles } from "./particles"
-import { boilSeed, burstPath, cloudPath, hatch, INK, jitter, roughArrow, roughEllipse, roughLine, roughPoly, scribble, starPath, withAlpha, type Pt } from "./sketch"
+import { boilSeed, burstPath, cloudPath, fraction, hatch, INK, jitter, roughArrow, roughEllipse, roughLine, roughPoly, scribble, starPath, withAlpha, type Pt } from "./sketch"
 import { animate, ease, lerp, nextFrame, wait } from "./tween"
 import { drawWizard } from "./wizard"
 
-/** Pen colours for each spell family. */
+/** Pen colours for each element (a family of actions). */
 export const ELEMENT_COLORS: Record<Element, string> = {
     fire: "#e2492b",
     frost: "#2b7fd3",
@@ -22,7 +22,7 @@ export const ELEMENT_COLORS: Record<Element, string> = {
     shadow: "#c9418a",
 }
 
-const Y_VIEW = 1.3 // visible half-height in field units
+const Y_VIEW = 1.35 // visible half-height in field units (the mirrors sit at ±FIELD.mirror, just inside)
 const FONT_HAND = "'Caveat', 'Patrick Hand', cursive"
 const FONT_MARKER = "'Permanent Marker', 'Patrick Hand', cursive"
 const POW_WORDS = ["POW!", "BAM!", "ZAP!", "WHAM!", "BONK!"]
@@ -45,7 +45,7 @@ interface WardView {
 interface ShotView extends CastResult {
     side: Side
     color: string
-    visual: AttackSpell["visual"]
+    visual: SpellAction["visual"]
     charge: number
     collapse: number
     head: number
@@ -85,6 +85,10 @@ interface ImpactMark {
 interface PreviewSet {
     committed: AttackPreview[]
     ghost: AttackPreview[]
+    /** Where the active wizard will stand once the planned moves are done (null: not moving). */
+    landing: number | null
+    /** A spell is planned, so the target's hitbox gets its red brackets. */
+    aiming: boolean
 }
 
 export class Battlefield {
@@ -100,7 +104,7 @@ export class Battlefield {
     private bursts: Burst[] = []
     private marks: ImpactMark[] = []
     private particles = new Particles()
-    private preview: PreviewSet = { committed: [], ghost: [] }
+    private preview: PreviewSet = { committed: [], ghost: [], landing: null, aiming: false }
     private shake = 0
     private width = 0
     private height = 0
@@ -136,15 +140,15 @@ export class Battlefield {
         this.floats = []
         this.bursts = []
         this.marks = []
-        this.preview = { committed: [], ghost: [] }
+        this.preview = { committed: [], ghost: [], landing: null, aiming: false }
         if (!this.running) {
             this.running = true
             nextFrame(this.frame)
         }
     }
 
-    setPreview(committed: AttackPreview[], ghost: AttackPreview[] = []) {
-        this.preview = { committed, ghost }
+    setPreview(committed: AttackPreview[], ghost: AttackPreview[] = [], landing: number | null = null, aiming = committed.length + ghost.length > 0) {
+        this.preview = { committed, ghost, landing, aiming }
     }
 
     /** End-of-duel expressions and confetti. */
@@ -175,9 +179,15 @@ export class Battlefield {
         return cy - worldY * unit
     }
 
-    /** Screen position of a point on a line in the caster's frame. */
+    /** Screen position of a point on a line in the caster's frame, after any mirror bounces. */
     private linePoint(side: Side, casterY: number, b0: number, b1: number, lx: number): Pt {
-        return [this.sx(toWorldX(side, lx)), this.sy(casterY + b0 + b1 * lx)]
+        return [this.sx(toWorldX(side, lx)), this.sy(reflect(casterY + b0 + b1 * lx))]
+    }
+
+    /** The zigzag a line follows from lx0 to lx1: straight pieces with a corner at every bounce. */
+    private linePath(side: Side, casterY: number, b0: number, b1: number, lx0: number, lx1: number): Pt[] {
+        const xs = [lx0, ...bouncePoints(casterY + b0, b1, lx0, lx1), lx1]
+        return xs.map((lx) => this.linePoint(side, casterY, b0, b1, lx))
     }
 
     // ---------- Event playback ----------
@@ -188,9 +198,13 @@ export class Battlefield {
                 return this.playMove(event.side, event.from, event.to)
             case "alteration": {
                 const m = event.mods
-                const spell = getSpell(event.spellId)
+                const action = getAction(event.actionId)
                 const label =
-                    spell.kind === "alteration" && spell.sdScale ? `σ × ${m.sdScale}` : spell.kind === "alteration" && spell.dBeta1 ? `β₁ ${signed(m.dBeta1)}` : `β₀ ${signed(m.dBeta0)}`
+                    action.kind === "alteration" && action.sdScale
+                        ? `σ × ${fraction(m.sdScale).replace("+", "")}`
+                        : action.kind === "alteration" && action.dBeta1
+                          ? `β₁ ${signed(m.dBeta1)}`
+                          : `β₀ ${signed(m.dBeta0)}`
                 return this.playBuff(event.side, label, ELEMENT_COLORS.arcane)
             }
             case "hex": {
@@ -259,7 +273,7 @@ export class Battlefield {
     }
 
     private async playCast(event: Extract<DuelEvent, { type: "cast" }>) {
-        const spell = getSpell(event.spellId) as AttackSpell
+        const spell = getAction(event.actionId) as SpellAction
         const color = ELEMENT_COLORS[spell.element]
         const shot: ShotView = { ...event, side: event.side, color, visual: spell.visual, charge: 0, collapse: 0, head: 0, fade: 1 }
         const caster = this.views[event.side]
@@ -268,8 +282,10 @@ export class Battlefield {
 
         this.shots.push(shot)
         this.float(spell.name, this.sx(event.side === "left" ? 0 : 1), this.sy(caster.y) - 84, color, 22, FONT_MARKER)
-        await Promise.all([animate(160, (t) => (caster.cast = t)), animate(420, (t) => (shot.charge = t))])
-        await animate(280, (t) => (shot.collapse = t), ease.inOutCubic)
+        await Promise.all([animate(160, (t) => (caster.cast = t)), animate(480, (t) => (shot.charge = t))])
+        // The band is the reveal: hold it long enough to compare with what you expected.
+        await wait(550)
+        await animate(320, (t) => (shot.collapse = t), ease.inOutCubic)
         sfx.play("whoosh")
 
         const travel = spell.visual === "ray" ? 320 : spell.visual === "bolt" ? 220 : 520
@@ -348,6 +364,7 @@ export class Battlefield {
         this.drawMarks()
         for (const w of this.wards) this.drawWard(w)
         this.drawPreviews()
+        this.drawLanding()
         this.drawWizards()
         this.drawTargetZone()
         for (const shot of this.shots) this.drawShot(shot)
@@ -440,13 +457,39 @@ export class Battlefield {
         ctx.lineCap = "round"
 
         // Lane guides: faint pencil dashes.
-        ctx.strokeStyle = withAlpha(INK.pencil, 0.35)
         ctx.lineWidth = 1
         ctx.setLineDash([7, 7])
-        ctx.beginPath()
-        for (const y of LANES) roughLine(ctx, left, this.sy(y), right, this.sy(y), seed + y * 10, 0.8, 1)
-        ctx.stroke()
+        for (const half of [true, false]) {
+            ctx.strokeStyle = withAlpha(INK.pencil, half ? 0.35 : 0.16)
+            ctx.beginPath()
+            for (const y of LANES.filter((l) => isHalfLane(l) === half)) roughLine(ctx, left, this.sy(y), right, this.sy(y), seed + y * 10, 0.8, 1)
+            ctx.stroke()
+        }
+        // Mirrors along the top and bottom edges, hatched on the back like in a physics diagram.
+        ctx.setLineDash([])
+        ctx.strokeStyle = withAlpha(INK.pen, 0.75)
+        for (const s of [1, -1]) {
+            const y = this.sy(s * FIELD.mirror)
+            ctx.lineWidth = 2
+            ctx.beginPath()
+            roughLine(ctx, left, y, right, y, seed + 40 + s, 0.5, 1)
+            ctx.stroke()
+            ctx.lineWidth = 1
+            ctx.beginPath()
+            for (let x = left + 6; x < right; x += 12) roughLine(ctx, x, y, x + 7, y - s * 7, seed + x, 0.3, 1)
+            ctx.stroke()
+        }
+        ctx.fillStyle = withAlpha(INK.pen, 0.55)
+        ctx.font = `700 13px ${FONT_HAND}`
+        ctx.textAlign = "right"
+        ctx.textBaseline = "top"
+        ctx.fillText("mirror", right - 8, this.sy(-FIELD.mirror) + 9)
+        ctx.textBaseline = "bottom"
+        ctx.fillText("mirror", right - 8, this.sy(FIELD.mirror) - 9)
+
         // Mid-field, dotted.
+        ctx.strokeStyle = withAlpha(INK.pencil, 0.35)
+        ctx.lineWidth = 1
         ctx.setLineDash([2, 6])
         ctx.beginPath()
         roughLine(ctx, this.sx(0.5), top, this.sx(0.5), bottom, seed + 5, 0.8, 1)
@@ -475,7 +518,8 @@ export class Battlefield {
         roughLine(ctx, left, top, left, bottom, seed + 8, 1)
         roughLine(ctx, right, top, right, bottom, seed + 9, 1)
         for (const lane of LANES) {
-            for (const x of [left, right]) roughLine(ctx, x - 5, this.sy(lane), x + 5, this.sy(lane), seed + lane * 3, 0.4, 1)
+            const tick = isHalfLane(lane) ? 5 : 3
+            for (const x of [left, right]) roughLine(ctx, x - tick, this.sy(lane), x + tick, this.sy(lane), seed + lane * 3, 0.4, 1)
         }
         ctx.stroke()
 
@@ -488,9 +532,12 @@ export class Battlefield {
         for (const lane of LANES) {
             const rel = lane - caster.y
             const isZero = Math.abs(rel) < 1e-6
-            ctx.fillStyle = isZero ? INK.pen : withAlpha(INK.pen, 0.55)
+            const half = isHalfLane(rel)
+            ctx.font = `700 ${half ? 17 : 13}px ${FONT_HAND}`
+            ctx.fillStyle = isZero ? INK.pen : withAlpha(INK.pen, half ? 0.55 : 0.4)
             ctx.fillText(isZero ? "0" : fraction(rel), lx, this.sy(lane))
         }
+        ctx.font = `700 17px ${FONT_HAND}`
         ctx.textAlign = "center"
         ctx.textBaseline = "top"
         ctx.fillStyle = withAlpha(INK.pen, 0.6)
@@ -505,6 +552,29 @@ export class Battlefield {
         }
         ctx.font = `italic 700 16px ${FONT_HAND}`
         ctx.fillText("x", ax1 + (onLeft ? 30 : -30), this.sy(caster.y) - 22)
+        ctx.restore()
+    }
+
+    /** A pencil ghost of yourself where your planned moves will leave you, with an arrow from here. */
+    private drawLanding() {
+        const y = this.preview.landing
+        if (y === null || !this.duel) return
+        const ctx = this.ctx
+        const side = this.duel.turn
+        const facing = side === "left" ? 1 : -1
+        const x = this.sx(side === "left" ? 0 : 1)
+        const { unit } = this.layout
+        ctx.save()
+        ctx.globalAlpha = 0.3
+        drawWizard(ctx, this.duel.wizards[side].character.look, x, this.sy(y), unit * 0.66, facing, { time: this.time, cast: 0, flash: 0, squash: 0, active: false })
+        ctx.globalAlpha = 0.75
+        ctx.strokeStyle = INK.pencil
+        ctx.lineWidth = 1.6
+        ctx.setLineDash([4, 4])
+        const from = this.sy(this.views[side].y)
+        const to = this.sy(y)
+        const ax = x - facing * unit * 0.22
+        roughArrow(ctx, ax, from, ax, to + Math.sign(from - to) * 6, boilSeed(this.time, 6), 6)
         ctx.restore()
     }
 
@@ -589,7 +659,28 @@ export class Battlefield {
         return { upper, lower, polygon: [...upper, ...[...lower].reverse()] }
     }
 
+    /**
+     * The band after bouncing: the unfolded band plus its reflection in each mirror, clipped to the
+     * space between them. That union is exactly where the band's heights end up once folded.
+     */
     private drawBand(polygon: Pt[], upper: Pt[], lower: Pt[], color: string, seed: number, alpha: number) {
+        const ctx = this.ctx
+        const top = this.sy(FIELD.mirror)
+        const bottom = this.sy(-FIELD.mirror)
+        ctx.save()
+        ctx.beginPath()
+        ctx.rect(0, top, this.width, bottom - top)
+        ctx.clip()
+        for (const flip of [(y: number) => y, (y: number) => 2 * top - y, (y: number) => 2 * bottom - y]) {
+            const ys = polygon.map(([, y]) => flip(y))
+            if (Math.max(...ys) < top || Math.min(...ys) > bottom) continue
+            const map = (pts: Pt[]) => pts.map(([x, y]): Pt => [x, flip(y)])
+            this.drawBandImage(map(polygon), map(upper), map(lower), color, seed, alpha)
+        }
+        ctx.restore()
+    }
+
+    private drawBandImage(polygon: Pt[], upper: Pt[], lower: Pt[], color: string, seed: number, alpha: number) {
         const ctx = this.ctx
         ctx.save()
         ctx.globalAlpha = alpha
@@ -623,14 +714,13 @@ export class Battlefield {
 
         let i = 0
         for (const { p, ghost } of all) {
-            const spell = getSpell(p.spellId)
+            const spell = getAction(p.actionId)
             const color = ELEMENT_COLORS[spell.element]
             const { upper, lower, polygon } = this.bandPoints(side, p.casterY, p.line)
             this.drawBand(polygon, upper, lower, color, seed + i * 7, ghost ? 0.45 : 0.9)
 
-            // Expected path: marching pen dashes toward the target.
-            const [x0, y0] = this.linePoint(side, p.casterY, p.line.beta0.mean, p.line.beta1.mean, 0)
-            const [x1, y1] = this.linePoint(side, p.casterY, p.line.beta0.mean, p.line.beta1.mean, 1)
+            // Expected path: marching pen dashes toward the target, bouncing off the mirrors.
+            const path = this.linePath(side, p.casterY, p.line.beta0.mean, p.line.beta1.mean, 0, 1)
             ctx.save()
             ctx.globalAlpha = ghost ? 0.5 : 1
             ctx.lineCap = "round"
@@ -639,7 +729,7 @@ export class Battlefield {
             ctx.strokeStyle = color
             ctx.lineWidth = 2.4
             ctx.beginPath()
-            roughLine(ctx, x0, y0, x1, y1, seed + i, 1.2, 1)
+            roughPoly(ctx, path, seed + i, 1.2)
             ctx.stroke()
             ctx.restore()
             // No hit-% label on purpose: judging the odds from the band is the skill being trained.
@@ -649,7 +739,7 @@ export class Battlefield {
 
     /** Red-pen brackets around the target's hitbox while aiming. */
     private drawTargetZone() {
-        if (!this.duel || this.preview.committed.length + this.preview.ghost.length === 0) return
+        if (!this.duel || !this.preview.aiming) return
         const ctx = this.ctx
         const targetSide: Side = this.duel.turn === "left" ? "right" : "left"
         const tv = this.views[targetSide]
@@ -715,14 +805,12 @@ export class Battlefield {
         const point = (lx: number) => this.linePoint(side, casterY, sample.beta0, sample.beta1, lx)
         if (shot.collapse > 0) {
             // Faint pencil guide of the realised line
-            const [gx0, gy0] = point(0)
-            const [gx1, gy1] = point(shot.endX)
             ctx.globalAlpha = shot.collapse * 0.4 * shot.fade
             ctx.strokeStyle = shot.color
             ctx.lineWidth = 1
             ctx.setLineDash([4, 4])
             ctx.beginPath()
-            roughLine(ctx, gx0, gy0, gx1, gy1, 9, 0.8, 1)
+            roughPoly(ctx, this.linePath(side, casterY, sample.beta0, sample.beta1, 0, shot.endX), 9, 0.8)
             ctx.stroke()
             ctx.setLineDash([])
         }
@@ -731,30 +819,38 @@ export class Battlefield {
             const [x0, y0] = point(0)
             const [hx, hy] = point(shot.head)
             ctx.globalAlpha = shot.fade
-            const dir = Math.atan2(hy - y0, hx - x0)
+            // Direction of travel right now: after a bounce it isn't the direction from the caster.
+            const [bx, by] = point(Math.max(0, shot.head - 0.02))
+            const dir = shot.head > 0.02 ? Math.atan2(hy - by, hx - bx) : Math.atan2(hy - y0, hx - x0)
 
             if (shot.visual === "ray") {
-                // Two pen lines with little snowflake asterisks along them.
+                // Two pen lines with little snowflake asterisks along them, one straight piece per bounce.
+                const path = this.linePath(side, casterY, sample.beta0, sample.beta1, 0, shot.head)
                 ctx.strokeStyle = shot.color
-                ctx.lineWidth = 2.2
-                ctx.beginPath()
-                const nx = -Math.sin(dir) * 4
-                const ny = Math.cos(dir) * 4
-                roughLine(ctx, x0 + nx, y0 + ny, hx + nx, hy + ny, seed + 1, 1, 1)
-                roughLine(ctx, x0 - nx, y0 - ny, hx - nx, hy - ny, seed + 2, 1, 1)
-                ctx.stroke()
-                ctx.lineWidth = 1.3
-                ctx.beginPath()
-                const len = Math.hypot(hx - x0, hy - y0)
-                for (let d = 24; d < len; d += 34) {
-                    const px = x0 + Math.cos(dir) * d
-                    const py = y0 + Math.sin(dir) * d
-                    for (let k = 0; k < 3; k++) {
-                        const a = (k / 3) * Math.PI + this.time * 3
-                        roughLine(ctx, px - Math.cos(a) * 5, py - Math.sin(a) * 5, px + Math.cos(a) * 5, py + Math.sin(a) * 5, seed + d + k, 0.3, 1)
+                for (let i = 1; i < path.length; i++) {
+                    const [ax, ay] = path[i - 1]
+                    const [ex, ey] = path[i]
+                    const d = Math.atan2(ey - ay, ex - ax)
+                    const nx = -Math.sin(d) * 4
+                    const ny = Math.cos(d) * 4
+                    ctx.lineWidth = 2.2
+                    ctx.beginPath()
+                    roughLine(ctx, ax + nx, ay + ny, ex + nx, ey + ny, seed + i * 5 + 1, 1, 1)
+                    roughLine(ctx, ax - nx, ay - ny, ex - nx, ey - ny, seed + i * 5 + 2, 1, 1)
+                    ctx.stroke()
+                    ctx.lineWidth = 1.3
+                    ctx.beginPath()
+                    const len = Math.hypot(ex - ax, ey - ay)
+                    for (let s = 24; s < len; s += 34) {
+                        const px = ax + Math.cos(d) * s
+                        const py = ay + Math.sin(d) * s
+                        for (let k = 0; k < 3; k++) {
+                            const a = (k / 3) * Math.PI + this.time * 3
+                            roughLine(ctx, px - Math.cos(a) * 5, py - Math.sin(a) * 5, px + Math.cos(a) * 5, py + Math.sin(a) * 5, seed + s + k, 0.3, 1)
+                        }
                     }
+                    ctx.stroke()
                 }
-                ctx.stroke()
             } else if (shot.visual === "bolt") {
                 // A jagged pen zigzag that redraws every frame.
                 ctx.strokeStyle = shot.color
@@ -866,11 +962,4 @@ function signed(v: number): string {
 }
 
 /** Handwritten-friendly numbers: ½ instead of 0.5. */
-function fraction(v: number): string {
-    const sign = v < 0 ? "−" : v > 0 ? "+" : ""
-    const a = Math.abs(v)
-    if (Math.abs(a - 0.5) < 1e-6) return `${sign}½`
-    if (Math.abs(a - 1.5) < 1e-6) return `${sign}1½`
-    if (Math.abs(a - 0.25) < 1e-6) return `${sign}¼`
-    return `${sign}${Math.round(a * 100) / 100}`
-}
+const isHalfLane = (y: number) => Math.abs(y * 2 - Math.round(y * 2)) < 1e-6

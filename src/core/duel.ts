@@ -1,12 +1,12 @@
 ﻿// The duel rules. Everything here resolves instantly and reports what happened as
 // events; the UI replays those events as animations.
 
-import { getSpell } from "../content/spells"
+import { getAction } from "../content/actions"
 import type { Character } from "../content/characters"
 import { createRng, shuffle, type Rng } from "./rng"
 import { attackLine, clampY, hitChance, NO_MODS, resolveShot, toWorldX } from "./shot"
 import type { LineDistribution } from "./stats"
-import { isDirectional, type AttackMods, type Card, type DuelEvent, type Play, type Side, type Spell, type Ward } from "./types"
+import { isDirectional, type AttackMods, type Card, type DuelEvent, type Play, type Side, type Action, type Ward } from "./types"
 
 export interface WizardState {
     side: Side
@@ -38,6 +38,8 @@ export class Duel {
     wizards: Record<Side, WizardState>
     turn: Side = "left"
     turnNumber = 0
+    /** Turns begun since anyone last took damage (the AI grows impatient). */
+    quietTurns = 0
     wards: Ward[] = []
     winner: Side | null = null
 
@@ -54,13 +56,13 @@ export class Duel {
     }
 
     private createWizard(side: Side, character: Character): WizardState {
-        const cards = character.deck.map((spellId) => ({ uid: this.nextUid++, spellId }))
+        const cards = character.deck.map((actionId) => ({ uid: this.nextUid++, actionId }))
         return {
             side,
             character,
             hp: character.hp,
             maxHp: character.hp,
-            y: 0,
+            y: character.startY ?? 0,
             ap: 0,
             hand: [],
             drawPile: shuffle(cards, this.rng),
@@ -83,6 +85,7 @@ export class Duel {
         const events: DuelEvent[] = []
         const w = this.active
         this.turnNumber++
+        this.quietTurns++
         w.ap = w.character.ap
         w.mods = { ...NO_MODS }
         w.turnSdScale = w.pendingHex
@@ -105,23 +108,23 @@ export class Duel {
         return w.drawPile.pop()
     }
 
-    /** Draw a fresh hand, guaranteeing at least one attack when the deck has any. */
+    /** Draw a fresh hand, guaranteeing at least one spell when the deck has any. */
     private draw(w: WizardState) {
         while (w.hand.length < w.character.handSize) {
             const card = this.drawOne(w)
             if (!card) break
             w.hand.push(card)
         }
-        const isAttack = (c: Card) => getSpell(c.spellId).kind === "attack"
-        if (w.hand.length > 0 && !w.hand.some(isAttack)) {
+        const isSpell = (c: Card) => getAction(c.actionId).kind === "spell"
+        if (w.hand.length > 0 && !w.hand.some(isSpell)) {
             const pool = [...w.drawPile, ...w.discard]
-            const attack = pool.find(isAttack)
-            if (attack) {
-                w.drawPile = w.drawPile.filter((c) => c !== attack)
-                w.discard = w.discard.filter((c) => c !== attack)
+            const spell = pool.find(isSpell)
+            if (spell) {
+                w.drawPile = w.drawPile.filter((c) => c !== spell)
+                w.discard = w.discard.filter((c) => c !== spell)
                 const swapIndex = Math.floor(this.rng.next() * w.hand.length)
                 w.drawPile.unshift(w.hand[swapIndex])
-                w.hand[swapIndex] = attack
+                w.hand[swapIndex] = spell
             }
         }
     }
@@ -133,10 +136,10 @@ export class Duel {
         const w = this.wizards[side]
         const card = w.hand.find((c) => c.uid === play.uid)
         if (!card) return "Card not in hand"
-        const spell = getSpell(card.spellId)
-        if (spell.cost > w.ap) return "Not enough action points"
-        if (isDirectional(spell) && !play.dir) return "Choose a direction"
-        if (spell.kind === "move" && clampY(w.y + spell.step * play.dir!) === w.y) return "Can't move further"
+        const action = getAction(card.actionId)
+        if (action.cost > w.ap) return "Not enough action points"
+        if (isDirectional(action) && !play.dir) return "Choose a direction"
+        if (action.kind === "movement" && clampY(w.y + action.step * play.dir!) === w.y) return "Can't move further"
         return null
     }
 
@@ -147,21 +150,21 @@ export class Duel {
         const w = this.active
         const target = this.wizards[other(w.side)]
         const card = w.hand.find((c) => c.uid === play.uid)!
-        const spell = getSpell(card.spellId)
+        const action = getAction(card.actionId)
         w.hand = w.hand.filter((c) => c !== card)
         w.discard.push(card)
-        w.ap -= spell.cost
+        w.ap -= action.cost
 
         const events: DuelEvent[] = []
-        switch (spell.kind) {
+        switch (action.kind) {
             case "alteration":
-                applyAlteration(w.mods, spell, play.dir)
-                events.push({ type: "alteration", side: w.side, spellId: spell.id, mods: { ...w.mods } })
+                applyAlteration(w.mods, action, play.dir)
+                events.push({ type: "alteration", side: w.side, actionId: action.id, mods: { ...w.mods } })
                 break
-            case "move": {
+            case "movement": {
                 const from = w.y
-                w.y = clampY(w.y + spell.step * play.dir!)
-                events.push({ type: "move", side: w.side, spellId: spell.id, from, to: w.y })
+                w.y = clampY(w.y + action.step * play.dir!)
+                events.push({ type: "move", side: w.side, actionId: action.id, from, to: w.y })
                 break
             }
             case "ward": {
@@ -169,28 +172,29 @@ export class Duel {
                 const ward: Ward = {
                     id: this.nextWardId++,
                     owner: w.side,
-                    x: toWorldX(w.side, spell.distance),
+                    x: toWorldX(w.side, action.distance),
                     y: (w.y + target.y) / 2,
-                    halfHeight: spell.halfHeight,
+                    halfHeight: action.halfHeight,
                 }
                 this.wards.push(ward)
-                events.push({ type: "ward", side: w.side, spellId: spell.id, ward })
+                events.push({ type: "ward", side: w.side, actionId: action.id, ward })
                 break
             }
             case "hex":
-                target.pendingHex *= spell.sdScale
-                events.push({ type: "hex", side: w.side, spellId: spell.id, target: target.side, sdScale: spell.sdScale })
+                target.pendingHex *= action.sdScale
+                events.push({ type: "hex", side: w.side, actionId: action.id, target: target.side, sdScale: action.sdScale })
                 break
-            case "attack": {
-                const line = attackLine(spell, w.mods, w.turnSdScale)
+            case "spell": {
+                const line = attackLine(action, w.mods, w.turnSdScale)
                 w.mods = { ...NO_MODS }
                 const result = resolveShot(line, w.side, w.y, target.y, this.wards, this.rng)
-                events.push({ type: "cast", side: w.side, spellId: spell.id, ...result })
+                events.push({ type: "cast", side: w.side, actionId: action.id, ...result })
                 if (result.outcome === "blocked") {
                     this.wards = this.wards.filter((wd) => wd.id !== result.wardId)
                 } else if (result.outcome === "hit") {
-                    target.hp = Math.max(0, target.hp - spell.damage)
-                    events.push({ type: "damage", side: target.side, amount: spell.damage, hp: target.hp })
+                    target.hp = Math.max(0, target.hp - action.damage)
+                    this.quietTurns = 0
+                    events.push({ type: "damage", side: target.side, amount: action.damage, hp: target.hp })
                     if (target.hp === 0) {
                         this.winner = w.side
                         events.push({ type: "gameOver", winner: w.side })
@@ -212,15 +216,15 @@ export class Duel {
     }
 }
 
-function applyAlteration(mods: AttackMods, spell: Extract<Spell, { kind: "alteration" }>, dir: number = 1) {
-    if (spell.dBeta0) mods.dBeta0 += spell.dBeta0 * dir
-    if (spell.dBeta1) mods.dBeta1 += spell.dBeta1 * dir
-    if (spell.sdScale) mods.sdScale *= spell.sdScale
+function applyAlteration(mods: AttackMods, action: Extract<Action, { kind: "alteration" }>, dir: number = 1) {
+    if (action.dBeta0) mods.dBeta0 += action.dBeta0 * dir
+    if (action.dBeta1) mods.dBeta1 += action.dBeta1 * dir
+    if (action.sdScale) mods.sdScale *= action.sdScale
 }
 
 export interface AttackPreview {
     uid: number
-    spellId: string
+    actionId: string
     line: LineDistribution
     casterY: number
     targetY: number
@@ -254,23 +258,23 @@ export function previewPlan(duel: Duel, side: Side, plays: Play[]): PlanPreview 
         const card = w.hand.find((c) => c.uid === play.uid)
         if (!card || used.has(play.uid)) return null
         used.add(play.uid)
-        const spell = getSpell(card.spellId)
-        if (spell.cost > ap) return null
-        if (isDirectional(spell) && !play.dir) return null
-        ap -= spell.cost
+        const action = getAction(card.actionId)
+        if (action.cost > ap) return null
+        if (isDirectional(action) && !play.dir) return null
+        ap -= action.cost
 
-        if (spell.kind === "alteration") {
-            applyAlteration(mods, spell, play.dir)
+        if (action.kind === "alteration") {
+            applyAlteration(mods, action, play.dir)
             pendingMods = true
-        } else if (spell.kind === "move") {
-            const next = clampY(y + spell.step * play.dir!)
+        } else if (action.kind === "movement") {
+            const next = clampY(y + action.step * play.dir!)
             if (next === y) return null
             y = next
-        } else if (spell.kind === "attack") {
-            const line = attackLine(spell, mods, w.turnSdScale)
+        } else if (action.kind === "spell") {
+            const line = attackLine(action, mods, w.turnSdScale)
             attacks.push({
                 uid: play.uid,
-                spellId: spell.id,
+                actionId: action.id,
                 line,
                 casterY: y,
                 targetY: target.y,

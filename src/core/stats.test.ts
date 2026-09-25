@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { createRng } from "./rng"
-import { attackLine, hitChance, resolveShot } from "./shot"
+import { attackLine, bouncePoints, FIELD, hitChance, reflect, resolveShot } from "./shot"
 import { ci95, heightAt, normalCdf, Z95 } from "./stats"
-import { getSpell } from "../content/spells"
-import type { AttackSpell, Ward } from "./types"
+import { getAction } from "../content/actions"
+import type { SpellAction, Ward } from "./types"
 
 describe("normal distribution", () => {
     test("CDF matches known values", () => {
@@ -23,10 +23,10 @@ describe("normal distribution", () => {
 })
 
 describe("spell uncertainty", () => {
-    const flame = getSpell("flame") as AttackSpell
-    const lightning = getSpell("chain_lightning") as AttackSpell
+    const flame = getAction("flame") as SpellAction
+    const lightning = getAction("chain_lightning") as SpellAction
     // Geometry tests use the most precise spell, so spread doesn't blur the answer.
-    const frost = getSpell("frost_ray") as AttackSpell
+    const frost = getAction("frost_ray") as SpellAction
 
     test("about 95% of shots land inside the 95% band", () => {
         const rng = createRng(2)
@@ -86,5 +86,50 @@ describe("spell uncertainty", () => {
     test("right-side wizards shoot in their own mirrored frame", () => {
         const line = attackLine(frost, { dBeta0: 0, dBeta1: -0.5, sdScale: 1 })
         expect(hitChance(line, "right", 0.5, 0, [])).toBeGreaterThan(0.8)
+    })
+})
+
+describe("mirrors", () => {
+    const frost = getAction("frost_ray") as SpellAction
+    const lightning = getAction("chain_lightning") as SpellAction
+    const m = FIELD.mirror
+
+    test("heights past a mirror fold back into the field", () => {
+        expect(reflect(0.5)).toBeCloseTo(0.5, 9)
+        expect(reflect(m + 0.3)).toBeCloseTo(m - 0.3, 9)
+        expect(reflect(-m - 0.3)).toBeCloseTo(-m + 0.3, 9)
+        expect(reflect(3 * m + 0.2)).toBeCloseTo(-m + 0.2, 9) // off the top, then off the bottom
+    })
+
+    test("a bank shot off the top mirror lands on a target it would otherwise miss", () => {
+        // From the top lane, slope +½ would end at 1½; the mirror at 1¼ sends it back down to 1.
+        const line = attackLine(frost, { dBeta0: 0, dBeta1: 0.5, sdScale: 1 })
+        expect(hitChance(line, "left", 1, 1, [])).toBeGreaterThan(0.99)
+        expect(resolveShot(line, "left", 1, 1, [], createRng(5)).outcome).toBe("hit")
+    })
+
+    test("exact hit chance with bounces agrees with simulation (a folded normal)", () => {
+        const rng = createRng(9)
+        // Wide lightning along the top edge, and two steep bank shots: each folds a lot of mass back.
+        for (const [casterY, targetY, dBeta1] of [
+            [1, 1, 0],
+            [0.5, 0.75, 1.5],
+            [-1, -0.5, -1],
+        ] as const) {
+            const line = attackLine(lightning, { dBeta0: 0, dBeta1, sdScale: 1 })
+            const exact = hitChance(line, "left", casterY, targetY, [])
+            let hits = 0
+            const n = 40_000
+            for (let i = 0; i < n; i++) if (resolveShot(line, "left", casterY, targetY, [], rng).outcome === "hit") hits++
+            expect(Math.abs(hits / n - exact)).toBeLessThan(0.01)
+        }
+    })
+
+    test("bounce points sit where the line meets a mirror", () => {
+        const xs = bouncePoints(1, 0.5)
+        expect(xs).toHaveLength(1)
+        expect(xs[0]).toBeCloseTo(0.5, 9)
+        expect(bouncePoints(0, 0.3)).toHaveLength(0)
+        expect(bouncePoints(0, 4)).toHaveLength(2) // unfolded it climbs from 0 to 4, crossing 1¼ and 3¾
     })
 })

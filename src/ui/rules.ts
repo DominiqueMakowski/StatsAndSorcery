@@ -16,10 +16,11 @@ export class RulesNote {
     /** Numbers come from the character, so the note stays true if the balance changes. */
     show(you: Character, onClose?: () => void) {
         this.el.querySelector(".rules-list")!.innerHTML = `
-            <li>It's <b>turn by turn</b>: you cast, then your opponent does.</li>
-            <li>Each turn you draw <b>${you.handSize} cards</b> and get <b>${you.ap} ★</b>. A card costs the ★ in its corner.</li>
+            <li>It's <b>turn by turn</b>: you act, then your opponent does.</li>
+            <li>Each turn you draw <b>${you.handSize} action cards</b> from your spellbook: <b>spells</b> to attack, <b>movements</b> to change lane and, later, <b>alterations</b> that tweak your next spell.</li>
+            <li>You get <b>${you.ap} action points ★</b> each turn (use them or lose them). Each card costs the ★ in its corner.</li>
             <li><b>Click cards below</b> to plan your turn. They're played <b>in the order you pick them</b> when you press <b>Cast!</b></li>
-            <li>Hits scratch out their ♥. Scratch them all out to win.</li>`
+            <li>Spells that hit scratch out their ♥. Scratch them all out to win.</li>`
         // Reopening while open (the "? rules" link) keeps whatever was waiting for it to close.
         this.onClose = onClose ?? (this.isOpen ? this.onClose : null)
         this.el.hidden = false

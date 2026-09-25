@@ -206,3 +206,14 @@ export function withAlpha(hex: string, alpha: number): string {
     const n = parseInt(hex.slice(1), 16)
     return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`
 }
+
+/** Handwritten quarters: 0.75 → "¾", -1.25 → "−1¼". */
+export function fraction(v: number): string {
+    const sign = v < 0 ? "−" : v > 0 ? "+" : ""
+    const a = Math.abs(v)
+    const quarters = a * 4
+    if (Math.abs(quarters - Math.round(quarters)) > 1e-6) return `${sign}${Math.round(a * 100) / 100}`
+    const whole = Math.floor(Math.round(quarters) / 4)
+    const glyph = ["", "¼", "½", "¾"][Math.round(quarters) % 4]
+    return `${sign}${whole || !glyph ? whole : ""}${glyph}`
+}

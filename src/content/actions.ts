@@ -1,14 +1,14 @@
-import type { Spell } from "../core/types"
+import type { Action } from "../core/types"
 
 // Field geometry reminder: lanes are ½ apart (y ∈ {−1, −½, 0, ½, 1}) and a wizard's
 // hitbox is ±0.18, so a shot's spread (σ at the target) of ~0.1 is "reliable" and ~0.3 is a gamble.
 
-export const Spells: Record<string, Spell> = {
-    // ---- Spells: each one trades precision against power ----
+export const Actions: Record<string, Action> = {
+    // ---- Actions: each one trades precision against power ----
     flame: {
         id: "flame",
         name: "Flame",
-        kind: "attack",
+        kind: "spell",
         element: "fire",
         cost: 1,
         damage: 1,
@@ -21,7 +21,7 @@ export const Spells: Record<string, Spell> = {
     frost_ray: {
         id: "frost_ray",
         name: "Frost Ray",
-        kind: "attack",
+        kind: "spell",
         element: "frost",
         cost: 2,
         damage: 1,
@@ -33,7 +33,7 @@ export const Spells: Record<string, Spell> = {
     chain_lightning: {
         id: "chain_lightning",
         name: "Chain Lightning",
-        kind: "attack",
+        kind: "spell",
         element: "storm",
         cost: 1,
         damage: 2,
@@ -43,38 +43,49 @@ export const Spells: Record<string, Spell> = {
         description: "Devastating, if it lands.",
     },
 
-    // ---- Actions ----
+    // ---- Movements ----
     move: {
         id: "move",
         name: "Move",
-        kind: "move",
+        kind: "movement",
         element: "nature",
         cost: 1,
-        step: 0.5,
+        step: 0.25,
         description: "Step one lane up or down.",
     },
 
-    // ---- Alterations: change the parameters of your next spell ----
-    shift: {
-        id: "shift",
-        name: "Shift",
+    // ---- Alterations: change a parameter of your next spell, named as in statistics ----
+    intercept: {
+        id: "intercept",
+        name: "Intercept",
         symbol: "β₀",
         kind: "alteration",
         element: "arcane",
         cost: 1,
         dBeta0: 0.5,
-        description: "Raise or lower where your next spell starts.",
+        description: "Raise or lower your next spell's intercept by ½: the whole line moves.",
     },
-    tilt: {
-        id: "tilt",
-        name: "Tilt",
+    slope: {
+        id: "slope",
+        name: "Slope",
         symbol: "β₁",
         kind: "alteration",
         element: "arcane",
         cost: 1,
         dBeta1: 0.5,
-        description: "Angle your next spell up or down.",
+        description: "Raise or lower your next spell's slope by ½: it climbs or dips as it flies.",
     },
+    halve_sd: {
+        id: "halve_sd",
+        name: "SD ÷ 2",
+        symbol: "σ",
+        kind: "alteration",
+        element: "arcane",
+        cost: 1,
+        sdScale: 0.5,
+        description: "Halve the standard deviation of your next spell: a narrower band.",
+    },
+    // Not in the run for now (kept simple); still listed in the action list.
     arc: {
         id: "arc",
         name: "Arc",
@@ -84,17 +95,7 @@ export const Spells: Record<string, Spell> = {
         cost: 1,
         dBeta0: 0.5,
         dBeta1: -0.5,
-        description: "Start higher, aim down: lob it over a wall.",
-    },
-    focus: {
-        id: "focus",
-        name: "Focus",
-        symbol: "σ ÷ 2",
-        kind: "alteration",
-        element: "arcane",
-        cost: 1,
-        sdScale: 0.5,
-        description: "Halve the spread of your next spell.",
+        description: "Intercept up, slope down, at once: lob it over a wall.",
     },
 
     // ---- Opponent tricks ----
@@ -118,12 +119,12 @@ export const Spells: Record<string, Spell> = {
         cost: 1,
         sdScale: 2,
         enemyOnly: true,
-        description: "Doubles the opponent's spread next turn.",
+        description: "Doubles your opponent's standard deviation next turn.",
     },
 }
 
-export function getSpell(id: string): Spell {
-    const spell = Spells[id]
-    if (!spell) throw new Error(`Unknown spell: ${id}`)
-    return spell
+export function getAction(id: string): Action {
+    const action = Actions[id]
+    if (!action) throw new Error(`Unknown action: ${id}`)
+    return action
 }

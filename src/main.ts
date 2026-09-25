@@ -2,12 +2,13 @@ import "./styles/main.css"
 import { sfx } from "./audio/sfx"
 import { Characters, type Character } from "./content/characters"
 import { HP_PER_WIN, newRun, runEnemy, runPlayer, RUN_STAGES, type RunState } from "./content/run"
-import { getSpell } from "./content/spells"
+import { getAction } from "./content/actions"
 import type { Side } from "./core/types"
 import { Battlefield } from "./render/battlefield"
 import { boilSeed, hatch, INK, roughLine, withAlpha } from "./render/sketch"
 import { nextFrame } from "./render/tween"
 import { drawWizard } from "./render/wizard"
+import { buildActionList } from "./ui/actionList"
 import { createCard } from "./ui/cards"
 import { Coach } from "./ui/coach"
 import { RulesNote } from "./ui/rules"
@@ -85,7 +86,7 @@ function setupFor(mode: Mode): DuelSetupView {
     }
 }
 
-// ---------- The run: three duels, a new spell after each ----------
+// ---------- The run: three duels, a new action after each ----------
 
 function startRun() {
     run = newRun()
@@ -122,20 +123,20 @@ function showReward() {
     const el = showOverlay(`
         <div class="note note-reward">
             <h2>Your spellbook grows</h2>
-            <p>Pick a new card. You also feel tougher: <b class="red">+${HP_PER_WIN} ♥</b></p>
+            <p>Pick a new action for your spellbook. You also feel tougher: <b class="red">+${HP_PER_WIN} ♥</b></p>
             <div class="reward-cards"></div>
             <div class="overlay-actions"><button class="btn btn-quiet" id="reward-skip">Skip</button></div>
         </div>`)
     const holder = el.querySelector<HTMLElement>(".reward-cards")!
-    const next = (spellId?: string) => {
-        if (spellId) run!.deck.push(spellId)
+    const next = (actionId?: string) => {
+        if (actionId) run!.deck.push(actionId)
         run!.maxHp += HP_PER_WIN
         run!.index++
         sfx.play("scribble")
         showIntro()
     }
     for (const id of choices) {
-        const card = createCard(getSpell(id), { affordable: true, onPlay: () => next(id) })
+        const card = createCard(getAction(id), { affordable: true, onPlay: () => next(id) })
         card.classList.add("is-choice")
         holder.appendChild(card)
     }
@@ -175,7 +176,7 @@ function showDuelWon(setup: DuelSetupView, stats: DuelStats) {
             <h1>Victory!</h1>
             <p>${setup.right.name} yields. Your lines ran true.</p>
             ${statsBlock(stats)}
-            <div class="overlay-actions"><button class="btn btn-primary" id="next-btn">Choose a new card →</button></div>
+            <div class="overlay-actions"><button class="btn btn-primary" id="next-btn">Learn a new action →</button></div>
         </div>`)
     el.querySelector<HTMLButtonElement>("#next-btn")!.onclick = showReward
 }
@@ -201,7 +202,7 @@ function showRunVictory() {
     const el = showOverlay(`
         <div class="scroll scroll-final">
             <h1>Run complete!</h1>
-            <p>Harry Plotter, Lin and the Outlier, all beaten.</p>
+            <p>Harry Plotter, Draco Malfit and Lord Voldemode, all beaten.</p>
             ${statsBlock(s, "the whole run")}
             <p class="fine">Over many shots, "landed" drifts toward what "the odds said". That's the whole trick.</p>
             <div class="overlay-actions">
@@ -235,6 +236,20 @@ function showResult(winner: Side, setup: DuelSetupView, stats: DuelStats) {
         </div>`)
     el.querySelector<HTMLButtonElement>("#again-btn")!.onclick = () => lastSetup && startDuel(lastSetup)
     el.querySelector<HTMLButtonElement>("#menu-btn")!.onclick = showTitle
+}
+
+// ---------- The action list ----------
+
+function showActionList() {
+    const el = showOverlay(`
+        <div class="note note-actions">
+            <h2>Action list</h2>
+            <p>Every action in the game, by type and by when you can first use it.</p>
+            <div class="action-list-holder"></div>
+            <div class="overlay-actions"><button class="btn btn-quiet" id="actions-close">Back to the notebook</button></div>
+        </div>`)
+    el.querySelector(".action-list-holder")!.appendChild(buildActionList())
+    el.querySelector<HTMLButtonElement>("#actions-close")!.onclick = () => (overlay.hidden = true)
 }
 
 // ---------- Doodle portraits & the title scene ----------
@@ -354,6 +369,10 @@ muteBtn.onclick = () => {
 renderMute()
 
 $("quit-btn").onclick = showTitle
+$("actions-btn").onclick = () => {
+    sfx.play("pop")
+    showActionList()
+}
 $("rules-btn").onclick = () => duelView?.showRules()
 $("tips-reset").onclick = (e) => {
     e.preventDefault()
