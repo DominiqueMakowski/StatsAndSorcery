@@ -4,18 +4,19 @@ import type { Spell } from "../core/types"
 // hitbox is ±0.18, so a shot's spread (σ at the target) of ~0.1 is "reliable" and ~0.3 is a gamble.
 
 export const Spells: Record<string, Spell> = {
-    // ---- Attacks ----
-    firebolt: {
-        id: "firebolt",
-        name: "Firebolt",
+    // ---- Spells: each one trades precision against power ----
+    flame: {
+        id: "flame",
+        name: "Flame",
         kind: "attack",
         element: "fire",
         cost: 1,
         damage: 1,
-        beta0: { mean: 0, sd: 0.05 },
-        beta1: { mean: 0, sd: 0.08 },
+        // A precise start but a wobbly angle: the band opens like a cone.
+        beta0: { mean: 0, sd: 0.01 },
+        beta1: { mean: 0, sd: 0.13 },
         visual: "projectile",
-        description: "A dependable bolt of flame.",
+        description: "A mild fireball. Starts true, wobbles as it flies.",
     },
     frost_ray: {
         id: "frost_ray",
@@ -39,39 +40,26 @@ export const Spells: Record<string, Spell> = {
         beta0: { mean: 0, sd: 0.14 },
         beta1: { mean: 0, sd: 0.2 },
         visual: "bolt",
-        description: "Devastating — if it lands.",
-    },
-    meteor: {
-        id: "meteor",
-        name: "Meteor",
-        kind: "attack",
-        element: "fire",
-        cost: 2,
-        damage: 3,
-        beta0: { mean: 0, sd: 0.1 },
-        beta1: { mean: 0, sd: 0.28 },
-        visual: "projectile",
-        description: "Huge, and hugely unpredictable.",
-    },
-    ember: {
-        id: "ember",
-        name: "Ember",
-        kind: "attack",
-        element: "fire",
-        cost: 0,
-        damage: 1,
-        beta0: { mean: 0, sd: 0.12 },
-        beta1: { mean: 0, sd: 0.22 },
-        visual: "projectile",
-        description: "Free to fling. Wobbly as anything.",
+        description: "Devastating, if it lands.",
     },
 
-    // ---- Modifiers ----
+    // ---- Actions ----
+    move: {
+        id: "move",
+        name: "Move",
+        kind: "move",
+        element: "nature",
+        cost: 1,
+        step: 0.5,
+        description: "Step one lane up or down.",
+    },
+
+    // ---- Alterations: change the parameters of your next spell ----
     shift: {
         id: "shift",
         name: "Shift",
         symbol: "β₀",
-        kind: "modifier",
+        kind: "alteration",
         element: "arcane",
         cost: 1,
         dBeta0: 0.5,
@@ -81,65 +69,35 @@ export const Spells: Record<string, Spell> = {
         id: "tilt",
         name: "Tilt",
         symbol: "β₁",
-        kind: "modifier",
+        kind: "alteration",
         element: "arcane",
         cost: 1,
         dBeta1: 0.5,
         description: "Angle your next spell up or down.",
     },
-    focus: {
-        id: "focus",
-        name: "Focus",
-        symbol: "σ ÷ 2",
-        kind: "modifier",
-        element: "arcane",
-        cost: 1,
-        sdScale: 0.5,
-        description: "Halve the spread of your next spell.",
-    },
     arc: {
         id: "arc",
         name: "Arc",
         symbol: "β₀+½, β₁−½",
-        kind: "modifier",
+        kind: "alteration",
         element: "arcane",
         cost: 1,
         dBeta0: 0.5,
         dBeta1: -0.5,
         description: "Start higher, aim down: lob it over a wall.",
     },
-    nudge: {
-        id: "nudge",
-        name: "Nudge",
-        symbol: "β₀ ¼",
-        kind: "modifier",
+    focus: {
+        id: "focus",
+        name: "Focus",
+        symbol: "σ ÷ 2",
+        kind: "alteration",
         element: "arcane",
-        cost: 0,
-        dBeta0: 0.25,
-        description: "A free quarter-lane shift. Small, but free.",
+        cost: 1,
+        sdScale: 0.5,
+        description: "Halve the spread of your next spell.",
     },
 
-    // ---- Movement ----
-    blink: {
-        id: "blink",
-        name: "Blink",
-        kind: "move",
-        element: "nature",
-        cost: 1,
-        step: 0.5,
-        description: "Step one lane up or down.",
-    },
-    leap: {
-        id: "leap",
-        name: "Leap",
-        kind: "move",
-        element: "nature",
-        cost: 1,
-        step: 1,
-        description: "Bound two lanes at once.",
-    },
-
-    // ---- Wards & hexes ----
+    // ---- Opponent tricks ----
     ward: {
         id: "ward",
         name: "Ward",
@@ -151,16 +109,6 @@ export const Spells: Record<string, Spell> = {
         enemyOnly: true,
         description: "A wall at mid-field that absorbs one shot.",
     },
-    doodle_wall: {
-        id: "doodle_wall",
-        name: "Doodle Wall",
-        kind: "ward",
-        element: "shadow",
-        cost: 1,
-        distance: 0.5,
-        halfHeight: 0.15,
-        description: "Scribble a wall at mid-field. Blocks one shot.",
-    },
     jinx: {
         id: "jinx",
         name: "Jinx",
@@ -171,16 +119,6 @@ export const Spells: Record<string, Spell> = {
         sdScale: 2,
         enemyOnly: true,
         description: "Doubles the opponent's spread next turn.",
-    },
-    smudge: {
-        id: "smudge",
-        name: "Smudge",
-        symbol: "σ × 2",
-        kind: "hex",
-        element: "shadow",
-        cost: 1,
-        sdScale: 2,
-        description: "Smear their lines: their spread doubles next turn.",
     },
 }
 

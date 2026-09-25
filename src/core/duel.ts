@@ -154,9 +154,9 @@ export class Duel {
 
         const events: DuelEvent[] = []
         switch (spell.kind) {
-            case "modifier":
-                applyModifier(w.mods, spell, play.dir)
-                events.push({ type: "modifier", side: w.side, spellId: spell.id, mods: { ...w.mods } })
+            case "alteration":
+                applyAlteration(w.mods, spell, play.dir)
+                events.push({ type: "alteration", side: w.side, spellId: spell.id, mods: { ...w.mods } })
                 break
             case "move": {
                 const from = w.y
@@ -212,7 +212,7 @@ export class Duel {
     }
 }
 
-function applyModifier(mods: AttackMods, spell: Extract<Spell, { kind: "modifier" }>, dir: number = 1) {
+function applyAlteration(mods: AttackMods, spell: Extract<Spell, { kind: "alteration" }>, dir: number = 1) {
     if (spell.dBeta0) mods.dBeta0 += spell.dBeta0 * dir
     if (spell.dBeta1) mods.dBeta1 += spell.dBeta1 * dir
     if (spell.sdScale) mods.sdScale *= spell.sdScale
@@ -231,7 +231,7 @@ export interface PlanPreview {
     attacks: AttackPreview[]
     finalY: number
     apLeft: number
-    /** Modifiers queued after the last attack (they would be wasted). */
+    /** Alterations queued after the last attack (they would be wasted). */
     danglingMods: boolean
 }
 
@@ -259,8 +259,8 @@ export function previewPlan(duel: Duel, side: Side, plays: Play[]): PlanPreview 
         if (isDirectional(spell) && !play.dir) return null
         ap -= spell.cost
 
-        if (spell.kind === "modifier") {
-            applyModifier(mods, spell, play.dir)
+        if (spell.kind === "alteration") {
+            applyAlteration(mods, spell, play.dir)
             pendingMods = true
         } else if (spell.kind === "move") {
             const next = clampY(y + spell.step * play.dir!)

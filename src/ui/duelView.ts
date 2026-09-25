@@ -88,6 +88,8 @@ export class DuelView {
         this.duel = new Duel({ left: setup.left, right: setup.right, seed: randomSeed() })
         this.queue = []
         this.hover = null
+        // A winning cast ends the duel before endTurn() can unlock the hand.
+        this.els.hand.classList.remove("is-locked")
         this.stats = { shots: 0, hits: 0, expectedHits: 0, outliers: 0, turns: 0 }
         this.castChances.clear()
         this.bf.showMeArrow = setup.mode === "pve"
@@ -275,37 +277,37 @@ export class DuelView {
         const wallAhead = this.duel.wards.some((w) => w.owner !== me.side && toLocalX(me.side, w.x) > 0 && toLocalX(me.side, w.x) < 1)
 
         if (this.stats.turns === 1) {
-            this.coach.say("first", "Hoot! Click a spell to plan it. The <b>hatched band</b> is where 95% of casts land, and the number is your <b>hit chance</b>. Enter casts.")
+            this.coach.say("first", "Hoot! Click a card to plan it. The <b>hatched band</b> is where 95% of casts land. Keep your target inside it.")
             return
         }
         if (me.turnSdScale > 1) {
-            this.coach.say("jinxed", "You're <b>jinxed</b>: your spread is doubled this turn. <b>Focus</b> halves it back, or fire something cheap and wait it out.")
+            this.coach.say("jinxed", "You're <b>jinxed</b>: your spread is doubled this turn. <b>Focus</b> halves it back.")
             return
         }
         if (wallAhead) {
-            this.coach.say("wall", "A wall at mid-field! A straight line hits it. Go <b>over</b>: Shift ▲ raises the start, Tilt ▼ brings it back down onto the target.")
+            this.coach.say("wall", "A wall at mid-field! <b>Tilt</b> swings your line into it; <b>Shift</b> and <b>Arc</b> go over it.")
             return
         }
         if (foe.y !== me.y) {
-            if (has("shift") || has("tilt")) this.coach.say("offlane", "They moved off your line. <b>Shift (β₀)</b> lifts the whole line; <b>Tilt (β₁)</b> angles it. With nothing in the way, either one works.")
-            else if (has("blink") || has("leap")) this.coach.say("chase", "They moved, and you have no modifier. <b>Blink</b> into their lane and your straight shots line up again.")
+            if (has("shift") || has("tilt")) this.coach.say("offlane", "They moved off your line. <b>Shift (β₀)</b> lifts the whole line; <b>Tilt (β₁)</b> angles it.")
+            else if (has("move")) this.coach.say("chase", "They stepped out of your lane. <b>Move</b> back in, then cast.")
             return
         }
         if (has("focus") && hand.some((s) => s.kind === "attack" && s.id !== "frost_ray")) {
-            this.coach.say("focus", "<b>Focus</b> halves the spread of your next attack: the band gets narrower, the hit chance climbs. Try it before a Chain Lightning.")
+            this.coach.say("focus", "<b>Focus</b> halves the spread of your next spell: a narrower band, fewer misses.")
         }
     }
 
     private coachAfterShot(event: Extract<DuelEvent, { type: "cast" }>) {
         const chance = this.castChances.get(event.spellId + ":" + this.stats.shots) ?? 0
         if (event.outcome === "miss" && chance >= 0.85) {
-            this.coach.say("variance", `Missed at ${Math.round(chance * 100)}%? That's variance for you. A ${Math.round((1 - chance) * 100)}% miss still happens ${Math.round((1 - chance) * 100)} times in 100.`)
+            this.coach.say("variance", `Missed at ${Math.round(chance * 100)}%? That's variance: it still misses ${Math.round((1 - chance) * 100)} times in 100.`)
         } else if (event.outcome === "hit" && chance <= 0.3) {
-            this.coach.say("lucky", `A ${Math.round(chance * 100)}% shot landed! Enjoy it, but don't plan around it: on average that shot misses ${Math.round((1 - chance) * 100)} times in 100.`)
+            this.coach.say("lucky", `A ${Math.round(chance * 100)}% shot landed! Enjoy it, but don't count on it.`)
         }
         const impact = event.sample.beta0 + event.sample.beta1
         const [lo, hi] = ci95(heightAt(event.line, 1))
-        if (impact < lo || impact > hi) this.coach.say("outlier", "That one landed <b>outside the 95% band</b>. About 1 cast in 20 does: the band is likely, not certain.")
+        if (impact < lo || impact > hi) this.coach.say("outlier", "That one landed <b>outside the 95% band</b>. About 1 cast in 20 does.")
     }
 
     // ---------- Queueing cards ----------
@@ -338,8 +340,8 @@ export class DuelView {
     }
 
     /**
-     * The queue with a new play added. Modifiers and moves slot in before a trailing
-     * attack, so "Firebolt, then Shift" means "shift the Firebolt".
+     * The queue with a new play added. Alterations and moves slot in before a trailing
+     * attack, so "Flame, then Shift" means "shift the Flame".
      */
     private withPlay(play: Play): Play[] {
         const spellOf = (p: Play) => getSpell(this.duel.active.hand.find((c) => c.uid === p.uid)!.spellId)
@@ -368,7 +370,7 @@ export class DuelView {
         const committed = previewPlan(this.duel, side, this.queue)?.attacks ?? []
         const ghost = this.hover && !this.queue.some((p) => p.uid === this.hover!.uid) ? previewPlan(this.duel, side, this.withPlay(this.hover))?.attacks : null
         if (!ghost) return this.bf.setPreview(committed)
-        // A hovered attack adds a new ghost line; a hovered modifier or move re-aims the queued attack.
+        // A hovered attack adds a new ghost line; a hovered alteration or move re-aims the queued attack.
         if (ghost.length > committed.length) this.bf.setPreview(committed, ghost.slice(committed.length))
         else this.bf.setPreview([], ghost)
     }
@@ -431,7 +433,7 @@ export class DuelView {
         else if (!this.isHumanTurn) hint = `${this.duel.active.character.name} is thinking…`
         else if (this.busy) hint = "casting…"
         else if (this.queue.length === 0) hint = "click cards to plan your turn (or press 1, 2, 3)"
-        else if (previewPlan(this.duel, this.duel.turn, this.queue)?.danglingMods) hint = "add an attack after your modifiers, or they're wasted"
+        else if (previewPlan(this.duel, this.duel.turn, this.queue)?.danglingMods) hint = "alterations need a spell after them, or they're wasted"
         else hint = "Enter to cast · Esc to clear"
         this.els.hint.textContent = hint
     }

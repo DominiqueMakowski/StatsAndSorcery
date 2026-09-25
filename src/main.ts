@@ -1,7 +1,7 @@
 import "./styles/main.css"
 import { sfx } from "./audio/sfx"
 import { Characters, type Character } from "./content/characters"
-import { HP_PER_WIN, newRun, rewardChoices, runEnemy, runPlayer, RUN_ENCOUNTERS, type RunState } from "./content/run"
+import { HP_PER_WIN, newRun, runEnemy, runPlayer, RUN_STAGES, type RunState } from "./content/run"
 import { getSpell } from "./content/spells"
 import type { Side } from "./core/types"
 import { Battlefield } from "./render/battlefield"
@@ -94,7 +94,7 @@ function showIntro() {
     const enemy = runEnemy(run)
     const el = showOverlay(`
         <div class="note note-intro">
-            <p class="note-kicker">duel ${run.index + 1} of ${RUN_ENCOUNTERS.length}</p>
+            <p class="note-kicker">duel ${run.index + 1} of ${RUN_STAGES.length}</p>
             <canvas class="portrait" width="150" height="170" aria-hidden="true"></canvas>
             <h2>${enemy.name}</h2>
             <p class="note-title">${enemy.title}</p>
@@ -115,11 +115,11 @@ function showIntro() {
 
 function showReward() {
     if (!run) return
-    const choices = rewardChoices(run)
+    const choices = RUN_STAGES[run.index].rewards
     const el = showOverlay(`
         <div class="note note-reward">
             <h2>Your spellbook grows</h2>
-            <p>Pick one spell to add to your deck. You also feel tougher: <b class="red">+${HP_PER_WIN} ♥</b></p>
+            <p>Pick a new card. You also feel tougher: <b class="red">+${HP_PER_WIN} ♥</b></p>
             <div class="reward-cards"></div>
             <div class="overlay-actions"><button class="btn btn-quiet" id="reward-skip">Skip</button></div>
         </div>`)
@@ -147,7 +147,7 @@ function onDuelFinished(winner: Side, setup: DuelSetupView, stats: DuelStats) {
         run.stats.outliers += stats.outliers
         run.stats.turns += stats.turns
         if (winner !== "left") return showRunDefeat(setup)
-        if (run.index >= RUN_ENCOUNTERS.length - 1) return showRunVictory()
+        if (run.index >= RUN_STAGES.length - 1) return showRunVictory()
         return showDuelWon(setup, stats)
     }
     showResult(winner, setup, stats)
@@ -172,7 +172,7 @@ function showDuelWon(setup: DuelSetupView, stats: DuelStats) {
             <h1>Victory!</h1>
             <p>${setup.right.name} yields. Your lines ran true.</p>
             ${statsBlock(stats)}
-            <div class="overlay-actions"><button class="btn btn-primary" id="next-btn">Choose a new spell →</button></div>
+            <div class="overlay-actions"><button class="btn btn-primary" id="next-btn">Choose a new card →</button></div>
         </div>`)
     el.querySelector<HTMLButtonElement>("#next-btn")!.onclick = showReward
 }
@@ -198,7 +198,7 @@ function showRunVictory() {
     const el = showOverlay(`
         <div class="scroll scroll-final">
             <h1>Run complete!</h1>
-            <p>Wendel, Lin and the Outlier, all beaten. The tails of the distribution hold no fear for you.</p>
+            <p>Wendel, Lin and the Outlier, all beaten.</p>
             ${statsBlock(s, "the whole run")}
             <p class="fine">Over many shots, "landed" drifts toward what "the odds said". That's the whole trick.</p>
             <div class="overlay-actions">

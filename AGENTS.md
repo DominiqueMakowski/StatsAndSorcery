@@ -2,14 +2,34 @@
 
 ## Intent
 
-Stats & Sorcery is an **educational duelling card game that builds intuition for statistics**, aimed at students who find the topic dry. Every attack spell is a linear model `y = β₀ + β₁·x`; the player learns what intercept, slope, spread and a 95% interval *feel* like by aiming spells. The lesson and the game mechanic are the same thing: the shaded band is the true confidence band, the hit chance is the true probability, and about one shot in twenty really does land outside the band.
+Stats & Sorcery is a **wizard duelling game that builds statistical intuition**, aimed at students who find the topic dry. Players learn what spread, a 95% interval, a probability or a distribution *feel* like by aiming spells, not by reading formulas. The lesson and the mechanic are the same thing: today every spell is a noisy line `y = β₀ + β₁·x`, the hatched band is its true 95% interval, and about one shot in twenty really does land outside it.
 
 Design priorities, in order:
 
-1. **Honest statistics.** Never fake randomness or fudge odds for drama. The displayed hit chance must equal the real probability; the band must be the true 95% interval. If a mechanic can't be explained in one plain sentence about lines and uncertainty, it probably doesn't belong.
-2. **Fun first, lecture never.** Teaching happens through play, contextual sticky notes and short opponent intros, not walls of text. A tip is one or two sentences.
+1. **Honest statistics.** Never fake randomness or fudge odds for drama. The band must be the true 95% interval, and any odds the game reveals must be the real probability. If a mechanic can't be explained in one plain sentence about uncertainty, it probably doesn't belong.
+2. **Fun first, lecture never.** Teaching happens through play, contextual sticky notes and one-line opponent intros, not walls of text. A tip is one or two short sentences.
 3. **Sleek and juicy.** One duel should feel finished: live aim preview, hit-stop, bursts, sound, keyboard play, no dead time.
 4. **Small, dependency-light, hackable.** Plain Vite + TypeScript, no framework, no image assets: everything is drawn in code.
+
+## Design direction
+
+**Show the uncertainty, not the answer.** The game never shows a hit chance while you aim: reading the odds off the band is the intuition we want players to build. Exact odds appear only afterwards, as feedback to check that intuition against (Hoot's "missed at 90%?" note, "the odds said" on the result scroll). Don't add aiming aids that do the judging for the player.
+
+**Nail the basics first.** The first duel gives the player exactly two cards: **Flame**, a spell (1 damage, average precision), and **Move**, an action (one lane up or down). Everything else is earned during the run, one idea per opponent. Don't add a card unless it teaches something the existing ones don't.
+
+Cards come in three categories:
+
+- **Spells** (`kind: "attack"`) are distributions over where a shot lands, and each one is a trade-off: precise (narrow band) but weak or costly, or powerful but wild. A new spell should sit at a new point on that trade-off, not just be better.
+- **Actions** (`kind: "move"`) change the situation rather than the spell. Move is the only one for now.
+- **Alterations** (`kind: "alteration"`) change the parameters of your next spell. Shift (β₀), Tilt (β₁), Arc and Focus (σ ÷ 2) exist in basic form and are unlocked after the first duel. Next to explore: curvature (a β₂·x² term, so spells can bend) and other tweaks to the distribution.
+
+Wards and hexes are opponent tricks for now (Lin's walls, the Outlier's Jinx).
+
+**Beyond lines.** Spells don't have to stay linear models. Future spells can draw on other statistical ideas, as long as each fits in one plain sentence and its odds stay exact. For example **Fire Rain**, an area-of-effect spell that falls at a point drawn from a Normal distribution with a given location and SD and hits everything within a radius: it teaches location vs. scale. Skewed, heavy-tailed or bimodal spells could follow. Where there's no closed form, estimate the hit chance by Monte Carlo with common random numbers, as `hitChance` in `shot.ts` already does with wards.
+
+**Funny names with a statistical twist.** Characters, items and places should ideally be puns on popular wizard references (Harry Potter, Tolkien, Merlin…) that allude to a stats concept, e.g. *Lord Voldemode*, *Tom Residdle*, *The Wizard of Odds*, *Logwarts School of Statcraft*. Keep them affectionate puns rather than the originals, and ideally let the name hint at what the opponent teaches. Draw from the approved list in [`docs/names.md`](docs/names.md), which also has story ideas (quest goals, items, places). The current names (Wobbly Wendel, Warden Lin) are placeholders; The Outlier is the right spirit.
+
+**Parked ideas** (from the original brainstorm): items (e.g. a hat granting +1 ★), charge-to-cast alterations, character archetypes (spellcaster vs. archer), cosmetics that evolve with progress, skill trees, online play and classroom tournaments.
 
 ## Art direction: the bored student's notebook
 
@@ -35,11 +55,11 @@ src/core/      pure rules, no DOM, fully tested
   duel.ts        the Duel state machine: hands, AP, wards, hexes; emits DuelEvent[]; previewPlan()
   ai.ts          enumerates every legal play sequence, scores expected damage, softmax by "sloppiness"
   rng.ts         seeded Mulberry32 + Box–Muller; duels and tests are reproducible
-  types.ts       Spell kinds (attack | modifier | move | ward | hex), Card, Play, DuelEvent
+  types.ts       card kinds (attack | alteration | move | ward | hex), Card, Play, DuelEvent
 src/content/   data only
-  spells.ts      every spell; enemyOnly ones are never offered as rewards
+  spells.ts      every card; enemyOnly ones are never offered to the player
   characters.ts  apprentice + 3 opponents, each with a look, sloppiness, intro and lesson
-  run.ts         the 3-duel run, reward pool, +1 ♥ per win, run statistics
+  run.ts         the 3-duel run: the cards each win offers, +1 ♥ per win, run statistics
 src/render/    canvas
   sketch.ts      hand-drawn primitives and the INK palette
   wizard.ts      the doodle wizard
@@ -60,14 +80,16 @@ src/styles/main.css  the whole notebook look; CSS variables at the top
 
 **Coordinate frames.** Each wizard casts in its own frame: `x` is distance travelled (0 at the caster, 1 at the target), `y` is relative to the caster's lane. `toWorldX`/`toLocalX` in `shot.ts` convert. The right-hand wizard's frame is mirrored.
 
-**Queue semantics.** Modifiers and moves queued after an attack slot in *before* it (`DuelView.withPlay`), so "Firebolt, then Shift" means "shift the Firebolt". Modifiers with no attack after them are wasted; the AI is penalised for that and the hint text warns the player.
+**Queue semantics.** Alterations and moves queued after a spell slot in *before* it (`DuelView.withPlay`), so "Flame, then Shift" means "shift the Flame". Alterations with no spell after them are wasted; the AI is penalised for that and the hint text warns the player.
 
 ## Balance notes
 
-- Lanes are ½ apart, hitbox is ±0.18, so a spread (σ at the target) around 0.1 is reliable and around 0.3 is a gamble. Firebolt aligned ≈ 94%; Chain Lightning aligned ≈ 54% for 2 damage.
-- Apprentice: 5 HP, 2 AP, hand of 3. Run: +1 ♥ and one new spell per win, full heal between duels.
-- Wendel teaches intercept (he dodges), Lin teaches slope (walls at mid-field force arcs), the Outlier teaches variance (jinx doubles your spread). New opponents should teach one idea each.
-- Cost-0 cards (Ember, Nudge) exist to make reward choices interesting; watch that they don't dominate.
+- Lanes are ½ apart and the hitbox is ±0.18, so a spread (σ at the target) around 0.1 is reliable and around 0.3 is a gamble. Aligned hit chances (internal, never shown while aiming): Flame 83%, Frost Ray ≈ 100% for 2 ★, Chain Lightning 54% for 2 damage. A jinxed Flame drops to 51%; a focused one rises to 99%.
+- Flame has a precise start (β₀ σ 0.01) but a wobbly angle (β₁ σ 0.13), so its band is a cone: ±0.02 at the staff, ±0.13 at mid-field, ±0.26 at the target. It's the first picture of "uncertainty grows with distance".
+- Apprentice: 5 HP, 2 ★, hand of 3, deck of 4 Flame + 3 Move. Each win gives +1 ♥ and one card from that stage's `rewards` in `run.ts`; full heal between duels.
+- One idea per opponent. Wendel (Flame + Move only, dodges) teaches reading the band. Lin (walls at mid-field) teaches slope vs. intercept: Tilt runs into a wall, Shift clears it, Arc lobs over when you're aligned (82% with Flame). The Outlier (Jinx doubles your spread) teaches variance: Focus, or a sure 1 over a risky 2.
+- With 2 ★, a spell plus two alterations doesn't fit in one turn; that's why Arc is a single card.
+- Damage is an integer and Flame already deals the minimum, so "precise but weak" can only mean "precise but costly" (Frost Ray) for now. A finer HP/damage scale would open up that axis.
 
 ## Conventions
 
@@ -88,7 +110,7 @@ bun run typecheck  # tsc --noEmit
 bun run build      # tsc && vite build → dist/ (relative base, works on GitHub Pages)
 ```
 
-**Deployment:** two workflows publish to the `gh-pages` branch (Pages source: "Deploy from a branch", `gh-pages`, root). `pages.yml` builds every push to `main` into the branch root, cleaning stale files but keeping `pr-preview/`. `pr-preview.yml` builds every pull request into `pr-preview/pr-<n>/` and comments the link on the PR, so main and PR versions are live at the same time. Both work because Vite's `base` is `./` (relative): keep it that way. Never commit `dist/`; it is gitignored. Never edit the `gh-pages` branch by hand.
+**Deployment:** two workflows publish to the `gh-pages` branch (Pages source: "Deploy from a branch", `gh-pages`, root). `pages.yml` builds every push to `main` into the branch root, cleaning stale files but keeping `pr-preview/`. `pr-preview.yml` builds every pull request into `pr-preview/pr-<n>/` and comments the link on the PR. Both work because Vite's `base` is `./` (relative): keep it that way. Never commit `dist/`; it is gitignored. Never edit the `gh-pages` branch by hand.
 
 **Running it:** the root `index.html` loads `/src/main.ts` and only works through Vite. Opening the file directly, or serving the repo root with a plain static server, gives a blank page. Use `bun run dev`, or build and serve `dist/`.
 
@@ -99,8 +121,7 @@ bun run build      # tsc && vite build → dist/ (relative base, works on GitHub
 - In dev, `window.__sas.duel` is the live `Duel` and `window.__sas.run` the run state. Modules can be imported in the browser console with `await import('/src/core/ai.ts')` to script turns (e.g. call `planTurn(duel, "left", 0, rng)` and click the matching `#hand .card[data-uid]`).
 - Tips are remembered in `localStorage` (`sas.tips`); use "show tips again" on the title page or clear the key.
 - If the canvas looks frozen in an embedded browser, check whether `requestAnimationFrame` is firing before suspecting the renderer; `nextFrame()` falls back to a 250 ms timer.
-- Screenshots to compare against: the title page (two wizards and a wandering band), a duel with a queued Firebolt (hatched band, red target brackets, highlighted hit chance), a "BAM!" hit, the victory scroll with the shot statistics, the reward note with three cards.
 
-## Roadmap (what's next)
+## Roadmap
 
-See `docs/PLAN.md` for the full plan. Open items: the Grimoire (short plain-language pages unlocked per lesson), a local save for runs, a settings screen, then online play. Deferred by design: charge-to-cast spells, skill trees, cosmetics.
+Open: the Grimoire (short plain-language pages unlocked per lesson), a local save for runs, a settings screen (including a "show odds" toggle), then new cards and opponents following the design direction above.

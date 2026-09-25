@@ -24,9 +24,9 @@ export interface AttackSpell extends SpellBase {
     visual: "projectile" | "ray" | "bolt"
 }
 
-/** Alters the caster's next attack this turn. Directional modifiers ask for up/down. */
-export interface ModifierSpell extends SpellBase {
-    kind: "modifier"
+/** Alters the parameters of the caster's next attack this turn. Directional ones ask for up/down. */
+export interface AlterationSpell extends SpellBase {
+    kind: "alteration"
     dBeta0?: number
     dBeta1?: number
     sdScale?: number
@@ -51,10 +51,14 @@ export interface HexSpell extends SpellBase {
     sdScale: number
 }
 
-export type Spell = AttackSpell | ModifierSpell | MoveSpell | WardSpell | HexSpell
+/**
+ * Every card. Players see three categories: spells (attack), actions (move) and alterations.
+ * Wards and hexes are opponent tricks for now.
+ */
+export type Spell = AttackSpell | AlterationSpell | MoveSpell | WardSpell | HexSpell
 
 export function isDirectional(spell: Spell): boolean {
-    return spell.kind === "move" || (spell.kind === "modifier" && (spell.dBeta0 !== undefined || spell.dBeta1 !== undefined))
+    return spell.kind === "move" || (spell.kind === "alteration" && (spell.dBeta0 !== undefined || spell.dBeta1 !== undefined))
 }
 
 export interface Card {
@@ -95,7 +99,7 @@ export interface CastResult {
 
 export type DuelEvent =
     | { type: "turnStart"; side: Side; turn: number }
-    | { type: "modifier"; side: Side; spellId: string; mods: AttackMods }
+    | { type: "alteration"; side: Side; spellId: string; mods: AttackMods }
     | { type: "move"; side: Side; spellId: string; from: number; to: number }
     | { type: "ward"; side: Side; spellId: string; ward: Ward }
     | { type: "wardExpired"; wardId: number }

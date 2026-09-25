@@ -1,14 +1,21 @@
-// A "run": three duels in a row, with a new spell for your book after each victory.
+// A "run": three duels in a row. You start with only Flame and Move; each win offers cards
+// that prepare you for the next opponent, so the game grows one idea at a time.
 
 import { Characters, type Character } from "./characters"
-import { Spells } from "./spells"
 
-export const RUN_ENCOUNTERS = ["wendel", "lin", "outlier"] as const
+export interface RunStage {
+    enemy: string
+    /** Cards offered after beating this opponent (pick one). */
+    rewards: string[]
+}
 
-/** Spells that can be offered as rewards (never enemy-only ones). */
-export const REWARD_POOL = Object.values(Spells)
-    .filter((s) => !s.enemyOnly)
-    .map((s) => s.id)
+export const RUN_STAGES: RunStage[] = [
+    // Bend the line: Lin's walls stop straight shots.
+    { enemy: "wendel", rewards: ["shift", "tilt", "arc"] },
+    // Trade precision for power: the Outlier doubles your spread.
+    { enemy: "lin", rewards: ["focus", "frost_ray", "chain_lightning"] },
+    { enemy: "outlier", rewards: [] },
+]
 
 /** Extra health the apprentice gains after each victory. */
 export const HP_PER_WIN = 1
@@ -24,7 +31,7 @@ export interface RunState {
 export interface RunStats {
     shots: number
     hits: number
-    /** Sum of the displayed hit chances of every shot: what "should" have landed. */
+    /** Sum of the true hit chances of every shot: what "should" have landed. */
     expectedHits: number
     /** Shots that landed outside the 95% band. */
     outliers: number
@@ -41,24 +48,5 @@ export function runPlayer(run: RunState): Character {
 }
 
 export function runEnemy(run: RunState): Character {
-    return Characters[RUN_ENCOUNTERS[run.index]]
-}
-
-/** Three distinct reward options; prefers spells you don't already own. */
-export function rewardChoices(run: RunState, random: () => number = Math.random): string[] {
-    const owned = new Set(run.deck)
-    const fresh = REWARD_POOL.filter((id) => !owned.has(id))
-    const pool = [...fresh]
-    const picks: string[] = []
-    while (picks.length < 3 && pool.length > 0) {
-        const i = Math.floor(random() * pool.length)
-        picks.push(pool.splice(i, 1)[0])
-    }
-    // Top up with duplicates of things you own (a second Shift is still useful).
-    const rest = REWARD_POOL.filter((id) => !picks.includes(id))
-    while (picks.length < 3 && rest.length > 0) {
-        const i = Math.floor(random() * rest.length)
-        picks.push(rest.splice(i, 1)[0])
-    }
-    return picks
+    return Characters[RUN_STAGES[run.index].enemy]
 }

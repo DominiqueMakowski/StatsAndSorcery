@@ -23,8 +23,10 @@ describe("normal distribution", () => {
 })
 
 describe("spell uncertainty", () => {
-    const firebolt = getSpell("firebolt") as AttackSpell
+    const flame = getSpell("flame") as AttackSpell
     const lightning = getSpell("chain_lightning") as AttackSpell
+    // Geometry tests use the most precise spell, so spread doesn't blur the answer.
+    const frost = getSpell("frost_ray") as AttackSpell
 
     test("about 95% of shots land inside the 95% band", () => {
         const rng = createRng(2)
@@ -42,8 +44,8 @@ describe("spell uncertainty", () => {
     })
 
     test("band half-width grows with distance", () => {
-        const line = attackLine(firebolt)
-        expect(heightAt(line, 0).sd * Z95).toBeCloseTo(firebolt.beta0.sd * Z95, 6)
+        const line = attackLine(flame)
+        expect(heightAt(line, 0).sd * Z95).toBeCloseTo(flame.beta0.sd * Z95, 6)
         expect(heightAt(line, 1).sd).toBeGreaterThan(heightAt(line, 0.5).sd)
     })
 
@@ -66,8 +68,8 @@ describe("spell uncertainty", () => {
     test("wards make slope and intercept different", () => {
         // Enemy one lane up; the ward sits on the straight line between the wizards.
         const ward: Ward = { id: 1, owner: "right", x: 0.5, y: 0.25, halfHeight: 0.15 }
-        const shifted = attackLine(firebolt, { dBeta0: 0.5, dBeta1: 0, sdScale: 1 })
-        const tilted = attackLine(firebolt, { dBeta0: 0, dBeta1: 0.5, sdScale: 1 })
+        const shifted = attackLine(frost, { dBeta0: 0.5, dBeta1: 0, sdScale: 1 })
+        const tilted = attackLine(frost, { dBeta0: 0, dBeta1: 0.5, sdScale: 1 })
         // Without the ward both corrections reach the target equally well...
         expect(hitChance(tilted, "left", 0, 0.5, [])).toBeCloseTo(hitChance(shifted, "left", 0, 0.5, []), 1)
         // ...with it, tilting runs straight into the ward while shifting passes over it.
@@ -76,13 +78,13 @@ describe("spell uncertainty", () => {
 
         // Aligned wizards: only an arc (up, then back down) gets around the ward.
         const lowWard: Ward = { ...ward, y: 0 }
-        expect(hitChance(attackLine(firebolt), "left", 0, 0, [lowWard])).toBeLessThan(0.05)
-        const arc = attackLine(firebolt, { dBeta0: 0.5, dBeta1: -0.5, sdScale: 1 })
+        expect(hitChance(attackLine(frost), "left", 0, 0, [lowWard])).toBeLessThan(0.05)
+        const arc = attackLine(frost, { dBeta0: 0.5, dBeta1: -0.5, sdScale: 1 })
         expect(hitChance(arc, "left", 0, 0, [lowWard])).toBeGreaterThan(0.8)
     })
 
     test("right-side wizards shoot in their own mirrored frame", () => {
-        const line = attackLine(firebolt, { dBeta0: 0, dBeta1: -0.5, sdScale: 1 })
+        const line = attackLine(frost, { dBeta0: 0, dBeta1: -0.5, sdScale: 1 })
         expect(hitChance(line, "right", 0.5, 0, [])).toBeGreaterThan(0.8)
     })
 })

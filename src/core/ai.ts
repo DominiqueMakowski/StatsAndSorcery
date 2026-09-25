@@ -50,7 +50,7 @@ export function scorePlan(duel: Duel, side: Side, plays: Play[]): number {
 
     // Standing in the opponent's lane makes you an easy target.
     if (preview.finalY === opponent.y) score -= 0.15
-    // A modifier with no attack after it is a wasted card, even for a sloppy wizard.
+    // An alteration with no attack after it is a wasted card, even for a sloppy wizard.
     if (preview.danglingMods) score -= 0.4
     score -= 0.02 * preview.apLeft
     return score

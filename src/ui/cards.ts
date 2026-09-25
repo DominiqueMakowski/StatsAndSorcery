@@ -130,7 +130,7 @@ export function spellGraph(spell: Spell): string {
             body += target(1, 0, seed + 4)
             break
         }
-        case "modifier":
+        case "alteration":
             if (spell.dBeta0 && spell.dBeta1) {
                 // Arc: up, then down, over a wall.
                 body = `<rect x="${gx(0.5) - 3}" y="${gy(0.32)}" width="6" height="${gy(-0.32) - gy(0.32)}" rx="1.5" fill="#7a7a7a" fill-opacity="0.5"/>`

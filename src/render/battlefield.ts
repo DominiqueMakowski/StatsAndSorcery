@@ -186,11 +186,11 @@ export class Battlefield {
         switch (event.type) {
             case "move":
                 return this.playMove(event.side, event.from, event.to)
-            case "modifier": {
+            case "alteration": {
                 const m = event.mods
                 const spell = getSpell(event.spellId)
                 const label =
-                    spell.kind === "modifier" && spell.sdScale ? `σ × ${m.sdScale}` : spell.kind === "modifier" && spell.dBeta1 ? `β₁ ${signed(m.dBeta1)}` : `β₀ ${signed(m.dBeta0)}`
+                    spell.kind === "alteration" && spell.sdScale ? `σ × ${m.sdScale}` : spell.kind === "alteration" && spell.dBeta1 ? `β₁ ${signed(m.dBeta1)}` : `β₀ ${signed(m.dBeta0)}`
                 return this.playBuff(event.side, label, ELEMENT_COLORS.arcane)
             }
             case "hex": {
@@ -642,40 +642,7 @@ export class Battlefield {
             roughLine(ctx, x0, y0, x1, y1, seed + i, 1.2, 1)
             ctx.stroke()
             ctx.restore()
-
-            // Hit chance, handwritten beside the target.
-            const pct = Math.round(p.hitChance * 100)
-            const labelColor = p.hitChance >= 0.66 ? ELEMENT_COLORS.nature : p.hitChance >= 0.33 ? "#c98a12" : INK.red
-            const inward = side === "left" ? -78 : 78
-            ctx.save()
-            ctx.globalAlpha = ghost ? 0.6 : 1
-            ctx.translate(x1 + inward, y1 - 30 - i * 44)
-            ctx.rotate(-0.06)
-            ctx.textAlign = "center"
-            ctx.textBaseline = "alphabetic"
-            // A highlighter swipe behind the number.
-            ctx.fillStyle = withAlpha(INK.highlighter, 0.7)
-            ctx.beginPath()
-            roughPoly(
-                ctx,
-                [
-                    [-36, -20],
-                    [36, -22],
-                    [37, 4],
-                    [-35, 6],
-                ],
-                seed + 300 + i,
-                1.5,
-                true
-            )
-            ctx.fill()
-            ctx.fillStyle = labelColor
-            ctx.font = `700 30px ${FONT_HAND}`
-            ctx.fillText(`${pct}%`, 0, 0)
-            ctx.font = `700 15px ${FONT_HAND}`
-            ctx.fillStyle = withAlpha(INK.pen, 0.7)
-            ctx.fillText("hit chance", 0, 17)
-            ctx.restore()
+            // No hit-% label on purpose: judging the odds from the band is the skill being trained.
             i++
         }
     }
