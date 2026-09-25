@@ -67,11 +67,12 @@ export const Characters: Record<string, Character> = {
         hp: 4,
         ap: 2,
         handSize: 3,
-        deck: ["flame", "flame", "slope", "intercept", "ward", "ward"],
+        // One wall in six cards: up on about a third of his turns. Two made him a wall-builder you couldn't get past without Intercept.
+        deck: ["flame", "flame", "flame", "slope", "intercept", "ward"],
         look: { ink: "#1f3d2a", tint: "#3f9a6b", accent: "#c0c6cc", hat: "hood", extra: "cape" },
         sloppiness: 0.3,
         caution: 0.5,
-        intro: "Draco builds walls at mid-field. A straight line runs right into them.",
+        intro: "Draco builds one-way walls at mid-field: they stop your spells, not his. A straight line runs right into them.",
         lesson: "The intercept (β₀) lifts the whole line; the slope (β₁) swings it through the middle. Only one of them clears a wall.",
     },
     voldemode: {

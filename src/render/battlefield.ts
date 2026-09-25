@@ -31,11 +31,24 @@ const POW_WORDS = ["POW!", "BAM!", "ZAP!", "WHAM!", "BONK!"]
 
 interface WizardView {
     y: number
+    /** The lane the axes are measured from: it catches up with `y` only once a hop has landed. */
+    frameY: number
+    /** Sideways offset in pixels (the arc of a hop). */
+    dx: number
     cast: number
     flash: number
     squash: number
     scale: number
     mood?: "happy" | "sad"
+}
+
+/** The dotted pencil path a hop leaves behind, drawn up to `drawn` (0–1) and fading with `alpha`. */
+interface HopTrail {
+    side: Side
+    from: number
+    to: number
+    drawn: number
+    alpha: number
 }
 
 interface WardView {
@@ -93,13 +106,19 @@ interface PreviewSet {
     aiming: boolean
 }
 
+/** Where a hop is at time t (0–1): `y` is the eased fraction of the way to the new lane, `x` a sideways bulge in pixels. */
+function hopPoint(t: number): { x: number; y: number } {
+    return { x: Math.sin(Math.PI * t) * 26, y: ease.inOutCubic(t) }
+}
+
 export class Battlefield {
     private ctx: CanvasRenderingContext2D
     private duel: Duel | null = null
     private views: Record<Side, WizardView> = {
-        left: { y: 0, cast: 0, flash: 0, squash: 0, scale: 1 },
-        right: { y: 0, cast: 0, flash: 0, squash: 0, scale: 1 },
+        left: { y: 0, frameY: 0, dx: 0, cast: 0, flash: 0, squash: 0, scale: 1 },
+        right: { y: 0, frameY: 0, dx: 0, cast: 0, flash: 0, squash: 0, scale: 1 },
     }
+    private hops: HopTrail[] = []
     private wards: WardView[] = []
     private shots: ShotView[] = []
     private floats: FloatText[] = []
@@ -135,8 +154,9 @@ export class Battlefield {
 
     setDuel(duel: Duel) {
         this.duel = duel
-        this.views.left = { y: duel.wizards.left.y, cast: 0, flash: 0, squash: 0, scale: 1 }
-        this.views.right = { y: duel.wizards.right.y, cast: 0, flash: 0, squash: 0, scale: 1 }
+        this.views.left = { y: duel.wizards.left.y, frameY: duel.wizards.left.y, dx: 0, cast: 0, flash: 0, squash: 0, scale: 1 }
+        this.views.right = { y: duel.wizards.right.y, frameY: duel.wizards.right.y, dx: 0, cast: 0, flash: 0, squash: 0, scale: 1 }
+        this.hops = []
         this.wards = []
         this.shots = []
         this.floats = []
@@ -254,18 +274,68 @@ export class Battlefield {
         await this.castPose(side, 250)
     }
 
+    /**
+     * A hop to the next lane: crouch, arc through the air leaving a dotted pencil trail, land with a
+     * squash and a "+1". It should read at a glance who moved, which way and how far.
+     */
     private async playMove(side: Side, from: number, to: number) {
         const v = this.views[side]
         const x = this.sx(side === "left" ? 0 : 1)
+        const inward = side === "left" ? 1 : -1
         const color = ELEMENT_COLORS.nature
+        const trail: HopTrail = { side, from, to, drawn: 0, alpha: 1 }
+        this.hops.push(trail)
+
+        await animate(140, (t) => (v.squash = 0.8 * t), ease.outCubic) // crouch
+        sfx.play("hop")
         this.puff(x, this.sy(from))
-        sfx.play("poof")
-        this.particles.burst(x, this.sy(from), color, 14, 3, ["tick"])
-        await animate(140, (t) => (v.scale = 1 - t))
+        this.particles.burst(x, this.sy(from), color, 10, 2.5, ["tick"])
+        await animate(560, (t) => {
+            const p = hopPoint(t)
+            v.y = lerp(from, to, p.y)
+            v.dx = inward * p.x
+            v.squash = -0.8 * Math.sin(Math.PI * t) // stretched in the air
+            trail.drawn = t
+            if (Math.random() < 0.45) this.particles.trail(x + v.dx, this.sy(v.y), color, 0.5)
+        })
         v.y = to
+        v.frameY = to
+        v.dx = 0
+        sfx.play("land")
         this.puff(x, this.sy(to))
         this.particles.burst(x, this.sy(to), color, 14, 3, ["tick", "star"])
-        await animate(260, (t) => (v.scale = t), ease.outBack)
+        this.float(fraction(to - from), x + inward * 52, this.sy(to) - 34, color, 30, FONT_MARKER)
+        await animate(240, (t) => (v.squash = 0.8 * (1 - t)), ease.outCubic) // land
+        v.squash = 0
+        animate(1100, (t) => (trail.alpha = 1 - t)).then(() => (this.hops = this.hops.filter((h) => h !== trail)))
+    }
+
+    /** The dotted arc a hop leaves, with an arrowhead once it has landed. */
+    private drawHop(h: HopTrail) {
+        const ctx = this.ctx
+        const inward = h.side === "left" ? 1 : -1
+        const x = this.sx(h.side === "left" ? 0 : 1)
+        const pts: Pt[] = []
+        for (let i = 0; i <= 18; i++) {
+            const p = hopPoint((i / 18) * h.drawn)
+            pts.push([x + inward * p.x, this.sy(lerp(h.from, h.to, p.y))])
+        }
+        ctx.save()
+        ctx.globalAlpha = h.alpha * 0.85
+        ctx.strokeStyle = ELEMENT_COLORS.nature
+        ctx.lineWidth = 2
+        ctx.lineCap = "round"
+        ctx.setLineDash([5, 6])
+        ctx.beginPath()
+        roughPoly(ctx, pts, 321, 0.8)
+        ctx.stroke()
+        if (h.drawn >= 1) {
+            ctx.setLineDash([])
+            const [ax, ay] = pts[pts.length - 3]
+            const [bx, by] = pts[pts.length - 1]
+            roughArrow(ctx, ax, ay, bx, by, 322, 9)
+        }
+        ctx.restore()
     }
 
     private puff(x: number, y: number) {
@@ -367,6 +437,7 @@ export class Battlefield {
         for (const w of this.wards) this.drawWard(w)
         this.drawPreviews()
         this.drawLanding()
+        for (const h of this.hops) this.drawHop(h)
         this.drawWizards()
         this.drawTargetZone()
         for (const shot of this.shots) this.drawShot(shot)
@@ -502,12 +573,12 @@ export class Battlefield {
         const ax1 = onLeft ? right : left
         ctx.strokeStyle = withAlpha(INK.pen, 0.7)
         ctx.lineWidth = 1.6
-        roughArrow(ctx, ax0, this.sy(caster.y), ax1 + (onLeft ? 26 : -26), this.sy(caster.y), seed + 6, 9)
+        roughArrow(ctx, ax0, this.sy(caster.frameY), ax1 + (onLeft ? 26 : -26), this.sy(caster.frameY), seed + 6, 9)
         // Tick marks for x = 0, ½, 1
         ctx.beginPath()
         for (const lx of [0.5, 1]) {
             const x = this.sx(toWorldX(frame, lx))
-            roughLine(ctx, x, this.sy(caster.y) - 5, x, this.sy(caster.y) + 5, seed + lx * 10, 0.4, 1)
+            roughLine(ctx, x, this.sy(caster.frameY) - 5, x, this.sy(caster.frameY) + 5, seed + lx * 10, 0.4, 1)
         }
         ctx.stroke()
 
@@ -529,7 +600,7 @@ export class Battlefield {
         const offset = 14
         const lx = onLeft ? left - offset : right + offset
         for (const lane of LANES) {
-            const rel = lane - caster.y
+            const rel = lane - caster.frameY
             const isZero = Math.abs(rel) < 1e-6
             ctx.fillStyle = isZero ? INK.pen : withAlpha(INK.pen, 0.55)
             ctx.fillText(isZero ? "0" : fraction(rel), lx, this.sy(lane))
@@ -544,10 +615,10 @@ export class Battlefield {
         ] as const) {
             const wx = this.sx(toWorldX(frame, x))
             // Keep labels off the wizards' feet by placing them just below the caster's lane.
-            ctx.fillText(label, wx, this.sy(caster.y) + 8)
+            ctx.fillText(label, wx, this.sy(caster.frameY) + 8)
         }
         ctx.font = `italic 700 16px ${FONT_HAND}`
-        ctx.fillText("x", ax1 + (onLeft ? 30 : -30), this.sy(caster.y) - 22)
+        ctx.fillText("x", ax1 + (onLeft ? 30 : -30), this.sy(caster.frameY) - 22)
         ctx.restore()
     }
 
@@ -580,7 +651,7 @@ export class Battlefield {
         for (const side of ["left", "right"] as const) {
             const v = this.views[side]
             const look = this.duel.wizards[side].character.look
-            drawWizard(this.ctx, look, this.sx(side === "left" ? 0 : 1), this.sy(v.y), unit * WIZARD_SIZE * v.scale, side === "left" ? 1 : -1, {
+            drawWizard(this.ctx, look, this.sx(side === "left" ? 0 : 1) + v.dx, this.sy(v.y), unit * WIZARD_SIZE * v.scale, side === "left" ? 1 : -1, {
                 time: this.time,
                 cast: v.cast,
                 flash: v.flash,
@@ -591,7 +662,12 @@ export class Battlefield {
         }
     }
 
-    /** A little brick wall doodle. */
+    /**
+     * A one-way wall: it stops the opponent's spells but lets its owner's through. The face toward
+     * the opponent is a solid pen line with dense hatching; the shading fades out toward the owner,
+     * whose side is dashed, and two chevrons point the way spells can pass. (A pencil gradient:
+     * the art direction rules out real ones.)
+     */
     private drawWard(view: WardView) {
         const ctx = this.ctx
         const { ward } = view
@@ -599,36 +675,63 @@ export class Battlefield {
         const h = ward.halfHeight * view.grow
         const y0 = this.sy(ward.y + h)
         const y1 = this.sy(ward.y - h)
-        const w = 18
+        const w = 26
+        // Direction from the wall toward the side it blocks (the owner's opponent).
+        const toFoe = ward.owner === "right" ? -1 : 1
+        const face = x + (toFoe * w) / 2
+        const back = x - (toFoe * w) / 2
         const seed = boilSeed(this.time, 4) + ward.id * 17
         const color = ELEMENT_COLORS.shadow
         ctx.save()
         ctx.globalAlpha = view.alpha
         ctx.lineCap = "round"
-        const rect: Pt[] = [
-            [x - w / 2, y0],
-            [x + w / 2, y0],
-            [x + w / 2, y1],
-            [x - w / 2, y1],
-        ]
-        ctx.fillStyle = withAlpha(color, 0.18)
-        ctx.beginPath()
-        roughPoly(ctx, rect, seed, 0.8, true)
-        ctx.fill()
+
+        // Pencil shading in columns: dark and tight at the face, faint and sparse toward the back.
+        const cols = 7
+        for (let c = 0; c < cols; c++) {
+            const u = c / (cols - 1)
+            const cx = lerp(face, back, u)
+            ctx.strokeStyle = withAlpha(color, 0.9 * (1 - u) ** 1.4 + 0.04)
+            ctx.lineWidth = 1.2
+            ctx.beginPath()
+            for (let yy = y0 + 3; yy < y1 - 2; yy += 4 + u * 7) roughLine(ctx, cx - 2, yy + 2, cx + 2, yy - 2, seed + c * 13 + Math.round(yy), 0.3, 1)
+            ctx.stroke()
+        }
+
+        // The blocking face, solid; the top and bottom, solid near the face; the owner's side, dashed.
         ctx.strokeStyle = color
-        ctx.lineWidth = 2
+        ctx.lineWidth = 2.8
         ctx.beginPath()
-        roughPoly(ctx, rect, seed, 0.8, true)
+        roughLine(ctx, face, y0, face, y1, seed + 1, 0.8, 1)
         ctx.stroke()
-        // Bricks
-        ctx.lineWidth = 1.2
+        ctx.lineWidth = 1.6
         ctx.beginPath()
-        const rows = Math.max(2, Math.floor((y1 - y0) / 9))
-        for (let i = 1; i < rows; i++) {
-            const yy = lerp(y0, y1, i / rows)
-            roughLine(ctx, x - w / 2, yy, x + w / 2, yy, seed + i, 0.5, 1)
-            const bx = i % 2 ? x - w / 6 : x + w / 6
-            roughLine(ctx, bx, yy, bx, lerp(y0, y1, (i + 1) / rows), seed + i + 30, 0.4, 1)
+        roughLine(ctx, face, y0, back, y0, seed + 2, 0.6, 1)
+        roughLine(ctx, face, y1, back, y1, seed + 3, 0.6, 1)
+        ctx.stroke()
+        ctx.lineWidth = 1.3
+        ctx.setLineDash([3, 4])
+        ctx.beginPath()
+        roughLine(ctx, back, y0, back, y1, seed + 4, 0.6, 1)
+        ctx.stroke()
+        ctx.setLineDash([])
+
+        // Chevrons on the faint side: the owner's spells pass this way.
+        ctx.lineWidth = 1.6
+        ctx.beginPath()
+        for (const k of [0.3, 0.7]) {
+            const cy = lerp(y0, y1, k)
+            const cx = lerp(face, back, 0.62)
+            roughPoly(
+                ctx,
+                [
+                    [cx - toFoe * 3, cy - 5],
+                    [cx + toFoe * 3, cy],
+                    [cx - toFoe * 3, cy + 5],
+                ],
+                seed + 5 + k * 10,
+                0.3
+            )
         }
         ctx.stroke()
         ctx.restore()

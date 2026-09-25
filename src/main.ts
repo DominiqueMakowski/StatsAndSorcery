@@ -1,7 +1,7 @@
 import "./styles/main.css"
 import { sfx } from "./audio/sfx"
 import { Characters, type Character } from "./content/characters"
-import { HP_PER_WIN, newRun, runEnemy, runPlayer, RUN_STAGES, type RunState } from "./content/run"
+import { HP_REWARD, newRun, runEnemy, runPlayer, RUN_STAGES, type RunState } from "./content/run"
 import { getAction } from "./content/actions"
 import type { Side } from "./core/types"
 import { Battlefield } from "./render/battlefield"
@@ -9,7 +9,7 @@ import { boilSeed, hatch, INK, roughLine, withAlpha } from "./render/sketch"
 import { nextFrame } from "./render/tween"
 import { drawWizard } from "./render/wizard"
 import { buildActionList } from "./ui/actionList"
-import { createCard } from "./ui/cards"
+import { createCard, createHeartCard } from "./ui/cards"
 import { Coach } from "./ui/coach"
 import { RulesNote } from "./ui/rules"
 import { DuelView, type DuelSetupView, type DuelStats, type Mode } from "./ui/duelView"
@@ -73,9 +73,10 @@ function showOverlay(html: string): HTMLElement {
 }
 
 function setupFor(mode: Mode): DuelSetupView {
-    if (mode === "pve") return { mode, left: Characters.apprentice, right: Characters.plotter }
+    if (mode === "pve") return { mode, left: Characters.apprentice, right: Characters.plotter, withRules: true }
     return {
         mode,
+        withRules: true,
         left: { ...Characters.apprentice, name: "Player 1" },
         right: {
             ...Characters.apprentice,
@@ -112,7 +113,7 @@ function showIntro() {
     livePortrait(el.querySelector<HTMLCanvasElement>(".portrait")!, enemy, -1)
     el.querySelector<HTMLButtonElement>("#intro-go")!.onclick = () => {
         sfx.play("pop")
-        startDuel({ mode: "pve", left: runPlayer(run!), right: enemy })
+        startDuel({ mode: "pve", left: runPlayer(run!), right: enemy, withRules: run!.index === 0 })
     }
     el.querySelector<HTMLButtonElement>("#intro-quit")!.onclick = showTitle
 }
@@ -122,15 +123,15 @@ function showReward() {
     const choices = RUN_STAGES[run.index].rewards
     const el = showOverlay(`
         <div class="note note-reward">
-            <h2>Your spellbook grows</h2>
-            <p>Pick a new action for your spellbook. You also feel tougher: <b class="red">+${HP_PER_WIN} ♥</b></p>
+            <h2>Choose a reward</h2>
+            <p>Learn a new action for your spellbook, or toughen up with one more heart.</p>
             <div class="reward-cards"></div>
-            <div class="overlay-actions"><button class="btn btn-quiet" id="reward-skip">Skip</button></div>
         </div>`)
     const holder = el.querySelector<HTMLElement>(".reward-cards")!
-    const next = (actionId?: string) => {
+    // One or the other: a new action, or health for the rest of the run.
+    const next = (actionId: string | null) => {
         if (actionId) run!.deck.push(actionId)
-        run!.maxHp += HP_PER_WIN
+        else run!.maxHp += HP_REWARD
         run!.index++
         sfx.play("scribble")
         showIntro()
@@ -140,7 +141,9 @@ function showReward() {
         card.classList.add("is-choice")
         holder.appendChild(card)
     }
-    el.querySelector<HTMLButtonElement>("#reward-skip")!.onclick = () => next()
+    const heart = createHeartCard(HP_REWARD, () => next(null))
+    heart.classList.add("is-choice")
+    holder.appendChild(heart)
 }
 
 function onDuelFinished(winner: Side, setup: DuelSetupView, stats: DuelStats) {
@@ -176,7 +179,7 @@ function showDuelWon(setup: DuelSetupView, stats: DuelStats) {
             <h1>Victory!</h1>
             <p>${setup.right.name} yields. Your lines ran true.</p>
             ${statsBlock(stats)}
-            <div class="overlay-actions"><button class="btn btn-primary" id="next-btn">Learn a new action →</button></div>
+            <div class="overlay-actions"><button class="btn btn-primary" id="next-btn">Choose a reward →</button></div>
         </div>`)
     el.querySelector<HTMLButtonElement>("#next-btn")!.onclick = showReward
 }
@@ -386,7 +389,7 @@ showTitle()
 // Dev shortcuts: ?duel=lin jumps straight into a quick duel against that opponent, and
 // window.__sas exposes the running duel for scripts.
 const wanted = new URLSearchParams(location.search).get("duel")
-if (wanted && Characters[wanted]) startDuel({ mode: "pve", left: Characters.apprentice, right: Characters[wanted] })
+if (wanted && Characters[wanted]) startDuel({ mode: "pve", left: Characters.apprentice, right: Characters[wanted], withRules: true })
 if (import.meta.env.DEV) {
     Object.assign(window, {
         __sas: {

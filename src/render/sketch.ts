@@ -228,3 +228,9 @@ export function starPoints(seed: number): string {
     }
     return pts.join(" ")
 }
+
+/** SVG path of a slightly wobbly heart in a 24×22 box: health in the HUD and on the reward card. */
+export function heartPath(seed: number): string {
+    const j = (i: number, a = 0.9) => (jitter(seed, i) * a).toFixed(1)
+    return `M12 ${20 + +j(1)} C ${2 + +j(2)} ${13 + +j(3)}, ${0 + +j(4)} ${7 + +j(5)}, ${3 + +j(6)} 4 C ${6 + +j(7)} ${1 + +j(8)}, ${10 + +j(9)} 2, 12 6 C ${14 + +j(10)} 2, ${18 + +j(11)} ${1 + +j(12)}, ${21 + +j(13)} 4 C ${24 + +j(14)} ${7 + +j(15)}, ${22 + +j(16)} ${13 + +j(17)}, 12 ${20 + +j(18)} Z`
+}

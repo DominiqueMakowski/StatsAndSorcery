@@ -17,8 +17,8 @@ export const RUN_STAGES: RunStage[] = [
     { enemy: "voldemode", rewards: [] },
 ]
 
-/** Extra health the apprentice gains after each victory. */
-export const HP_PER_WIN = 1
+/** The alternative to a new action after each win: extra health for the rest of the run. */
+export const HP_REWARD = 1
 
 export interface RunState {
     index: number

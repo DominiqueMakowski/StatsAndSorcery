@@ -4,7 +4,7 @@
 import { attackLine, FIELD } from "../core/shot"
 import { heightAt, Z95 } from "../core/stats"
 import type { Direction, Action } from "../core/types"
-import { fraction, jitter, starPoints } from "../render/sketch"
+import { fraction, heartPath, jitter, starPoints } from "../render/sketch"
 
 export interface CardOptions {
     order?: number
@@ -276,23 +276,39 @@ function statsLine(action: Action): string {
     return `<div class="card-stats"><span>95% band <b>±${(Z95 * h.sd).toFixed(1)}</b></span><span>dmg <b>${action.damage}</b></span></div>`
 }
 
+/** The change an alteration of a single parameter makes (+2 for Intercept, say), or null. */
+function singleStep(action: Action): number | null {
+    if (action.kind !== "alteration" || (action.dBeta0 === undefined) === (action.dBeta1 === undefined)) return null
+    return (action.dBeta0 ?? action.dBeta1)!
+}
+
+/**
+ * A card's title. Alterations carry their signature so cards with other values can coexist: a
+ * card you aim up or down reads "Intercept ±2"; a fixed one would read "Intercept −3".
+ */
+function cardTitle(action: Action): string {
+    const step = singleStep(action)
+    return step === null ? action.name : `${action.name} ±${fraction(Math.abs(step)).replace("+", "")}`
+}
+
 export function createCard(action: Action, opts: CardOptions): HTMLElement {
+    const title = cardTitle(action)
     const el = document.createElement("div")
     el.className = "card"
     el.style.setProperty("--el", `var(--${action.element})`)
     el.style.setProperty("--tilt", `${(jitter(hashId(action.id) + (opts.order ?? 0), 3) * 2.2).toFixed(2)}deg`)
-    if (action.name.length > 10) el.classList.add("has-long-name")
+    if (title.length + (action.symbol?.length ?? 0) > 12) el.classList.add("has-long-name")
     if (opts.order) el.classList.add("is-queued")
     if (!opts.affordable && !opts.order) el.classList.add("is-unaffordable")
     el.setAttribute("role", "button")
-    el.setAttribute("aria-label", `${action.name} (${action.kind}), ${action.cost} action point${action.cost === 1 ? "" : "s"}. ${action.description}`)
+    el.setAttribute("aria-label", `${title} (${action.kind}), ${action.cost} action point${action.cost === 1 ? "" : "s"}. ${action.description}`)
 
     el.innerHTML = `
         <span class="card-tape">${action.kind}</span>
         <div class="card-cost" title="Action points"><svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="${starPoints(hashId(action.id))}"/></svg><span>${action.cost}</span></div>
         ${opts.order ? `<div class="card-order">${opts.order}</div>` : ""}
         <div class="card-head">
-            <span class="card-name">${action.name}</span>
+            <span class="card-name">${title}</span>
             ${action.symbol ? `<span class="card-symbol">${action.symbol}</span>` : ""}
         </div>
         ${actionGraph(action)}
@@ -301,8 +317,8 @@ export function createCard(action: Action, opts: CardOptions): HTMLElement {
     `
 
     if (opts.dirs && !opts.order) {
-        // An alteration of one parameter labels its buttons with the change itself (+½, −½).
-        const step = action.kind === "alteration" && (action.dBeta0 === undefined) !== (action.dBeta1 === undefined) ? (action.dBeta0 ?? action.dBeta1)! : null
+        // An alteration of one parameter labels its buttons with the change itself (+2, −2).
+        const step = singleStep(action)
         const dirs = document.createElement("div")
         dirs.className = "card-dirs"
         for (const [dir, label, allowed] of [
@@ -327,6 +343,23 @@ export function createCard(action: Action, opts: CardOptions): HTMLElement {
         el.onmouseenter = () => opts.onHover?.(undefined)
         el.onmouseleave = () => opts.onHover?.(null)
     }
+    return el
+}
+
+/** The other reward after a win: one more heart for the rest of the run, as an index card. */
+export function createHeartCard(amount: number, onPick: () => void): HTMLElement {
+    const el = document.createElement("div")
+    el.className = "card card-heart"
+    el.style.setProperty("--el", "var(--red)")
+    el.style.setProperty("--tilt", "-1.4deg")
+    el.setAttribute("role", "button")
+    el.setAttribute("aria-label", `+${amount} heart for the rest of the run`)
+    el.innerHTML = `
+        <span class="card-tape">health</span>
+        <div class="card-head"><span class="card-name">+${amount} Heart</span></div>
+        <svg class="card-heart-art" viewBox="-1 -1 26 24" aria-hidden="true"><path d="${heartPath(7)}"/></svg>
+        <div class="card-desc">One more ♥ for the rest of the run.</div>`
+    el.onclick = onPick
     return el
 }
 

@@ -8,7 +8,7 @@
 
 Spells never fly exactly where you aim, and the game won't show you where they'll go: each card tells you how its spell behaves, you guess, you cast, and the true 95% band appears as it flies. Line up, cast, dodge, bounce shots off the mirrored edges. After a few duels, spread, intervals and probabilities start to *feel* obvious.
 
-Every card is an action (a spell, a movement or an alteration) that costs action points (★). Your spellbook starts with just two, **Flame** and **Move**, and each win teaches you a new one: first alterations that bend your spells, then spells that trade precision for power.
+Every card is an action (a spell, a movement or an alteration) that costs action points (★). Your spellbook starts with just two, **Flame** and **Move**. After each win you choose: learn a new action (first alterations that bend your spells, then spells that trade precision for power) or gain an extra heart.
 
 ## Development
 

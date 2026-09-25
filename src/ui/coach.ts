@@ -30,7 +30,7 @@ export class Coach {
     }
 
     /** True the first time a key comes up (persisted), then false until tips are reset. */
-    firstTime(key: string): boolean {
+    private firstTime(key: string): boolean {
         if (this.seen.has(key)) return false
         this.seen.add(key)
         try {

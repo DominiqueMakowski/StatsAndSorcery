@@ -22,6 +22,8 @@ export interface DuelSetupView {
     mode: Mode
     left: Character
     right: Character
+    /** Open with the rules note: the first duel of a run, and standalone duels. Not remembered between visits. */
+    withRules?: boolean
 }
 
 /** What happened during one duel, from the left (human) wizard's point of view. */
@@ -190,7 +192,7 @@ export class DuelView {
         if (this.isHumanTurn) {
             this.stats.turns++
             this.refresh()
-            if (this.stats.turns === 1 && this.coach.firstTime("rules")) {
+            if (this.stats.turns === 1 && this.setup.withRules) {
                 // Hoot's first tip waits until the rules are out of the way (if the turn hasn't moved on).
                 const session = this.session
                 this.rules.show(this.duel.active.character, () => {

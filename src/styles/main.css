@@ -1183,6 +1183,24 @@ b {
     animation: deal 0.45s var(--ease-out) both;
 }
 
+.card-heart .card-head {
+    padding-left: 0;
+}
+
+.card-heart-art {
+    align-self: center;
+    width: 76px;
+    height: 70px;
+    margin: 8px 0 6px;
+}
+
+.card-heart-art path {
+    fill: var(--red);
+    stroke: var(--ink);
+    stroke-width: 1.3;
+    stroke-linejoin: round;
+}
+
 .reward-cards .card.is-choice:hover {
     transform: translateY(-12px) rotate(0deg) scale(1.06);
 }

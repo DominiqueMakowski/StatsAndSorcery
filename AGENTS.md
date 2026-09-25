@@ -31,12 +31,12 @@ Don't add aiming aids that do the judging for the player. What stays visible is 
 - A **card** shows one **action** (`Action` in code). Every action costs **action points**, drawn as ★ (`cost`; a character's per-turn budget is `ap`), and has a **type** (`kind`):
   - **Spells** (`"spell"`) are distributions over where a shot lands, and each one is a trade-off: precise (narrow band) but weak or costly, or powerful but wild. A new spell should sit at a new point on that trade-off, not just be better.
   - **Movements** (`"movement"`) change where you stand rather than the spell. Move is the only one for now.
-  - **Alterations** (`"alteration"`) change one parameter of your next spell, and are named with the statistical term so players pick up the vocabulary: **Intercept** (β₀, ±2), **Slope** (β₁, ±2), **SD ÷ 2** (σ). Their ± buttons show the actual change (+2, −2: two lanes). They're unlocked after the first duel. Arc (β₀ +2 and β₁ −2 at once) exists but is out of the run for now, to keep things simple. Next to explore: curvature (a β₂·x² term, so spells can bend) and other tweaks to the distribution.
-  - Wards and hexes (`"ward"`, `"hex"`) are opponent tricks for now (Draco's walls, Voldemode's Jinx).
+  - **Alterations** (`"alteration"`) change one parameter of your next spell, and are named with the statistical term so players pick up the vocabulary: **Intercept** (β₀, ±2), **Slope** (β₁, ±2), **SD ÷ 2** (σ). A card's title carries its signature, built from its data (`cardTitle` in `cards.ts`): a card you aim either way reads **Intercept ±2** and its buttons show +2 / −2 (two lanes). Cards with other values can then coexist; a fixed-sign one such as *Intercept −3* would need a flag so it isn't directional, and would read with its signed value. They're unlocked after the first duel. Arc (β₀ +2 and β₁ −2 at once) exists but is out of the run for now, to keep things simple. Next to explore: curvature (a β₂·x² term, so spells can bend) and other tweaks to the distribution.
+  - Wards and hexes (`"ward"`, `"hex"`) are opponent tricks for now (Draco's walls, Voldemode's Jinx). Walls are one-way: they stop the opponent's spells and let the owner's through, drawn with pencil shading that is dark on the blocking face and fades toward the owner, plus chevrons pointing the way through.
 - Your **spellbook** is your deck: each turn you draw a hand of action cards from it.
 - The **Grimoire** is the book of every action you know (not built yet, see below).
 
-**Grimoire → spellbook → hand.** The plan: every action a player unlocks goes into their Grimoire, the big book of all known actions, each with a short plain-language page on what it does to the distribution. Before a duel, they pick N of them to form their spellbook, and each turn's hand is drawn from that. Players shape what *can* be drawn without controlling what *will* be: they manage odds, not outcomes, which is the game's lesson again (a deck is a distribution; drawing a hand is sampling without replacement). For now there's no Grimoire screen: each win adds its reward straight to the spellbook.
+**Grimoire → spellbook → hand.** The plan: every action a player unlocks goes into their Grimoire, the big book of all known actions, each with a short plain-language page on what it does to the distribution. Before a duel, they pick N of them to form their spellbook, and each turn's hand is drawn from that. Players shape what *can* be drawn without controlling what *will* be: they manage odds, not outcomes, which is the game's lesson again (a deck is a distribution; drawing a hand is sampling without replacement). For now there's no Grimoire screen: an action picked after a win goes straight into the spellbook.
 
 **Mirrors.** The top and bottom edges of the field are mirrors (at ±4, a lane beyond the outer lanes): spells bounce off them, so a line aimed past the edge comes back in, and a wide band hugging an edge folds back on itself. Statistically the landing point is a *folded normal*: `foldedIntervalProb` in `stats.ts` sums the normal over every mirror image of the target, so hit chances stay exact, and the drawn band is the unfolded band plus its reflections. Bank shots are modest with ±2 slopes; bigger slope alterations would make them a real tactic.
 
@@ -56,7 +56,7 @@ The whole game is a page in the notebook of a bored but talented student doodlin
 - **Fills are pencil, not flat.** Bands are hatching; robes are a low-alpha tint plus hatch lines; blobs are scribbles. Avoid glows, gradients, blur and neon.
 - **Characters are cute doodles**: big round head, dot eyes, rosy cheeks, tiny body, a hat and a staff. Personality comes from small extras (beard, glasses, cape, scarf) and expressions (blink, casting eyebrows, × eyes when hit, happy/sad at the end). See `src/render/wizard.ts`.
 - **Text is handwritten**: Permanent Marker for titles and names, Patrick Hand for UI, Caveat for annotations and numbers. Prefer ½ and ¼ over 0.5 and 0.25 in labels.
-- **Juice is comic-book**: "POW!/BAM!" bursts, "whiff~", "CLANK", page shake, scribbled-out hearts, confetti stars. Sounds are synthesised pencil scratches, whooshes and pops (`src/audio/sfx.ts`), never sample files.
+- **Juice is comic-book**: "POW!/BAM!" bursts, "whiff~", "CLANK", page shake, scribbled-out hearts, confetti stars. A move is a readable hop, not a teleport: crouch, arc through the air leaving a dotted green trail with an arrowhead, land with a squash and a "+1"/"−1". The axes stay on the old lane until the landing, so labels never show fractions. Sounds are synthesised pencil scratches, whooshes and pops (`src/audio/sfx.ts`), never sample files.
 - **CSS tricks in use**: mismatched border radii for hand-drawn boxes (`--hand-radius`), SVG feTurbulence for paper grain (`--paper-noise`), a `--tilt` per card.
 
 If you add UI, ask: "would this be on the page, drawn with these pens?" A modal with a drop shadow and rounded corners is not; a taped-on note is.
@@ -74,7 +74,7 @@ src/core/      pure rules, no DOM, fully tested
 src/content/   data only
   actions.ts     every action; enemyOnly ones are never offered to the player
   characters.ts  apprentice + 3 opponents, each with a look, sloppiness, intro and lesson
-  run.ts         the 3-duel run: the cards each win offers, +1 ♥ per win, run statistics
+  run.ts         the 3-duel run: the actions each win offers (or +1 ♥ instead), run statistics
 src/render/    canvas
   sketch.ts      hand-drawn primitives and the INK palette
   wizard.ts      the doodle wizard
@@ -86,7 +86,7 @@ src/ui/        DOM
   cards.ts       card markup and the sketchy SVG mini-graph on each card
   hud.ts         name strips, hearts, stars, "jinxed" chip
   coach.ts       Professor Hoot's once-only sticky notes (persisted in localStorage)
-  rules.ts       the rules sticky note: shown before your first duel, reopened from "? rules"
+  rules.ts       the rules sticky note: opens every first duel (duel 1 of a run, quick and two-player duels), not remembered; reopened from "? rules"
   actionList.ts  the "Action list" page: every action by type, sorted by when you can first use it
 src/audio/sfx.ts  WebAudio synth; mute persisted in localStorage
 src/main.ts    screens: title, run intro → duel → reward → …, result scrolls, portraits, dev hooks
@@ -105,8 +105,8 @@ src/styles/main.css  the whole notebook look; CSS variables at the top
 - Other hit chances (internal, never shown while aiming): Frost Ray ≈ 100% for 2 ★, Chain Lightning 54% for 2 damage. A jinxed Flame drops to 51%; with SD ÷ 2 it rises to 99%. Intercept and Slope move a line by 2, i.e. two lanes.
 - Flame has a precise start (β₀ σ 0.04) but a wobbly angle (β₁ σ 0.52), so its band is a cone: ±0.08 at the staff, ±0.5 at mid-field, ±1.0 (about a lane) at the target. It's the first picture of "uncertainty grows with distance".
 - **AI caution.** Hitting and dodging cost the same 1 ★, so an AI that only counts damage dealt never dodges. Each AI subtracts `caution` × the damage it could take where it ends its turn (`threatAt`: the foe's best mix of moving into line and firing). Low caution slugs it out, high caution hits and runs or keeps away. Caution halves every 3 turns without a hit ("impatience"), so two careful wizards can't circle each other forever (there's a test for that). Harry: caution 0.8, sloppiness 0.4, 4 ♥, starts a lane up so turn one is already a choice.
-- Simulated AI-vs-AI with a decent player (sloppiness 0.3): Harry is won ~85% of the time in ~7–11 of your turns, Draco 61–68% (Slope vs. Intercept), Voldemode ~54%. Re-check these after any balance change.
-- Apprentice: 5 HP, 2 ★, hand of 3, spellbook of 4 Flame + 3 Move. Each win gives +1 ♥ and one action from that stage's `rewards` in `run.ts`; full heal between duels.
+- Apprentice: 5 HP, 2 ★, hand of 3, spellbook of 4 Flame + 3 Move. After each win the player chooses **one** reward: an action from that stage's `rewards` in `run.ts`, or +1 ♥ for the rest of the run (`HP_REWARD`). Full heal between duels.
+- Simulated AI-vs-AI with a decent player (sloppiness 0.3), per reward path: Harry ~85% (7–11 of your turns). Draco (1 wall in 6 cards, up on ~⅓ of his turns): Intercept 67%, Slope 65%, +1 ♥ 70%. With 2 walls they were up on 61% of his turns and players without Intercept won under half the time. Voldemode: +1 ♥ 56–61% and Chain Lightning 53–56%, but SD ÷ 2 and Frost Ray only 34–38%. **Known trap:** with 2 ★ a turn, "a sure hit for 2 ★" (SD ÷ 2 + Flame ≈ 99%, Frost Ray ≈ 100%) loses to two 83% Flames (1.66 expected damage). Precision needs to be cheaper, or turns need more ★, before those rewards are worth taking. Re-check these after any balance change.
 - One idea per opponent. Harry Plotter (Flame + Move only, dodges) teaches reading the band. Draco Malfit (walls at mid-field) teaches slope vs. intercept: changing the slope swings the line into a wall, raising the intercept clears it. Lord Voldemode (Jinx doubles your spread) teaches variance: SD ÷ 2, or a sure 1 over a risky 2.
 - With 2 ★, a spell plus two alterations doesn't fit in one turn; that's what Arc (both at once) was for, if walls ever need it again.
 - Damage is an integer and Flame already deals the minimum, so "precise but weak" can only mean "precise but costly" (Frost Ray) for now. A finer HP/damage scale would open up that axis.
@@ -139,7 +139,7 @@ bun run build      # tsc && vite build → dist/ (relative base, works on GitHub
 - Put rules and maths in `src/core` and cover them in `*.test.ts`; UI and rendering are verified by playing.
 - `?duel=plotter|malfit|voldemode` on the dev server jumps straight into a quick duel against that opponent; add `&aim` to see the planning preview (band and path) that players don't get.
 - In dev, `window.__sas.duel` is the live `Duel` and `window.__sas.run` the run state. Modules can be imported in the browser console with `await import('/src/core/ai.ts')` to script turns (e.g. call `planTurn(duel, "left", 0, rng)` and click the matching `#hand .card[data-uid]`).
-- Tips are remembered in `localStorage` (`sas.tips`); use "show tips again" on the title page or clear the key.
+- Hoot's tips are remembered in `localStorage` (`sas.tips`); use "show tips again" on the title page or clear the key. That and the mute setting are the only things stored (no cookies, nothing leaves the browser); the rules note is deliberately not remembered.
 - If the canvas looks frozen in an embedded browser, check whether `requestAnimationFrame` is firing before suspecting the renderer; `nextFrame()` falls back to a 250 ms timer.
 
 ## Roadmap

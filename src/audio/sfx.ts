@@ -1,6 +1,6 @@
 // Tiny synthesised sound effects: pencil scratches, whooshes and pops. No audio files.
 
-export type SfxName = "scribble" | "pop" | "whoosh" | "hit" | "miss" | "block" | "page" | "win" | "lose" | "poof" | "buff"
+export type SfxName = "scribble" | "pop" | "whoosh" | "hit" | "miss" | "block" | "page" | "win" | "lose" | "poof" | "buff" | "hop" | "land"
 
 const STORAGE_KEY = "sas.muted"
 
@@ -117,6 +117,16 @@ class Sfx {
                     break
                 case "poof":
                     this.hiss({ duration: 0.18, type: "bandpass", from: 800, to: 300, gain: 0.08, q: 1.5 })
+                    break
+                case "hop":
+                    // A springy boing up, and the swish of a robe.
+                    this.tone({ freq: 260, to: 620, duration: 0.18, type: "sine", gain: 0.09 })
+                    this.hiss({ duration: 0.3, type: "bandpass", from: 500, to: 1400, gain: 0.05, q: 0.9 })
+                    break
+                case "land":
+                    // A soft thump of shoes on paper.
+                    this.tone({ freq: 170, to: 80, duration: 0.12, type: "sine", gain: 0.12 })
+                    this.hiss({ duration: 0.12, type: "lowpass", from: 900, to: 200, gain: 0.07 })
                     break
                 case "page":
                     this.hiss({ duration: 0.35, type: "bandpass", from: 1200, to: 2200, gain: 0.07, q: 0.8 })
